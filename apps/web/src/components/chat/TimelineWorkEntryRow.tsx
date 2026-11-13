@@ -37,6 +37,7 @@ import { Button, InlineButton } from "../ui/button";
 import { useAssetUrls } from "../../assets/assetUrls";
 import { useThreadShell } from "../../state/entities";
 import {
+  plainWorkEntryLabel,
   threadReadLabelPrefix,
   threadReadTargetId,
   threadReadTargetTitle,
@@ -44,6 +45,7 @@ import {
   workEntryReadOutput,
 } from "./MessagesTimeline.logic";
 import { cn } from "~/lib/utils";
+import { useClientSettings } from "../../hooks/useSettings";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { FetchedToolOutput, V2ItemInspector } from "./V2ItemInspector";
 import { SubagentNotificationLink } from "./V2LifecycleRow";
@@ -205,6 +207,7 @@ export function ViewedImagesTimelineRow({
 
 function WorkEntryLogRow(props: WorkEntryRowProps) {
   const { workEntry, workspaceRoot, displayLabel } = props;
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   const ctx = use(TimelineRowCtx);
   const { threadRef, onImageExpand, timestampFormat } = ctx;
   const { retryableWorkspacePreparationRunIds, onRetryWorkspacePreparation } = ctx;
@@ -320,12 +323,14 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const questionHeading = workEntry.questionAnswer
     ? getQuestionTextPreview(workEntry.questionAnswer)
     : "";
+  const plainLabel = ceoModeEnabled ? plainWorkEntryLabel(workEntry) : null;
   const previewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
         ? "Thinking"
         : "Thought"
-      : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
+      : questionHeading ||
+        (plainLabel ?? displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
       ? getQuestionAnswerPreview(workEntry.questionAnswer)

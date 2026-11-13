@@ -337,6 +337,33 @@ it.layer(Layer.provideMerge(layerTools, layerOrchestration))("work a link starts
     }),
   );
 
+  it.effect("keeps the thread that launched another on the launched thread's shell", () =>
+    Effect.gen(function* () {
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const parent = yield* usersOwnThread;
+      const side = ThreadId.make("thread:side");
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("create:side"),
+        threadId: side,
+        projectId,
+        title: "Side thread",
+        modelSelection: { instanceId, model: "gpt-5" },
+        runtimeMode: "auto",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        launchedByThreadId: parent,
+        createdBy: "agent",
+        creationSource: "mcp",
+      });
+      assert.equal((yield* projections.getThreadShell(side))?.launchedByThreadId, parent);
+      const fromLaptop = yield* launch(laptop, "From the laptop");
+      assert.equal((yield* projections.getThreadShell(fromLaptop))?.launchedByThreadId, undefined);
+    }),
+  );
+
   it.effect("changes only that link's threads below full access", () =>
     Effect.gen(function* () {
       const projections = yield* ProjectionStore.ProjectionStoreV2;

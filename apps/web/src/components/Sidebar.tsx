@@ -209,6 +209,9 @@ import {
   type SidebarListItem,
   type SidebarSection,
   resolveSidebarRowThreadId,
+  resolveThreadLastVisitedAt,
+  threadNeedsMe,
+  nestLaunchedThreads,
 } from "./Sidebar.logic";
 import {
   createSidebarCollisionDetection,
@@ -356,6 +359,8 @@ interface SidebarThreadPartitionInput {
   readonly workingShelfEnabled: boolean;
   /** Boring mode: folders list active threads by the user's latest message. */
   readonly sortActiveBySend: boolean;
+  /** CEO mode lists threads an agent launched under the thread that launched them. */
+  readonly nestLaunched: boolean;
   // Snooze wakes, the queued-turn grace and the Working shelf's exit grace depend
   // on the clock, so the minute tick, the precise snooze-wake tick and the inbox
   // tracker's expiry version are inputs: a new key repartitions.
@@ -441,6 +446,7 @@ function useSidebarThreads(input: {
   // Folders already separate the work, so boring mode has no Working shelf.
   const workingShelfEnabled =
     useClientSettings((s) => s.sidebarWorkingShelfEnabled) && folderGroups === null;
+  const nestLaunched = useClientSettings((s) => s.ceoModeEnabled) && folderGroups === null;
   const inboxReturnsVersion = useSyncExternalStore(
     inboxReturns.subscribe,
     inboxReturns.getSnapshot,
@@ -485,6 +491,7 @@ function useSidebarThreads(input: {
     optimisticDrop,
     workingShelfEnabled,
     sortActiveBySend: folderGroups !== null,
+    nestLaunched,
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
 
@@ -620,6 +627,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     optimisticDrop,
     workingShelfEnabled,
     sortActiveBySend,
+    nestLaunched,
   } = input;
   const preciseNow = new Date().toISOString();
   const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
@@ -682,7 +690,15 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     : workingShelfEnabled
       ? sortInboxThreadsByReturn(active, inboxObservation.returnedAt)
       : sortThreadsForSidebar(active);
+  const nestedKeys = new Set<string>();
+  const nest = (list: EnvironmentThreadShell[]) => {
+    if (!nestLaunched) return list;
+    const result = nestLaunchedThreads(list, threadShellKey);
+    for (const key of result.nested) nestedKeys.add(key);
+    return result.threads;
+  };
   return {
+    nestedKeys,
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
         ? sortedPinned
@@ -693,7 +709,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
           }),
     draggableThreadKeys,
     activeReorderableThreadKeys,
-    activeThreads:
+    activeThreads: nest(
       optimisticDrop?.section !== "active" || optimisticDrop.order === null
         ? sortedActive
         : orderItemsByPreferredIds({
@@ -701,13 +717,14 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
             preferredIds: optimisticDrop.order,
             getId: (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
           }),
-    workingThreads: sortWorkingThreadsBySend(working),
+    ),
+    workingThreads: nest(sortWorkingThreadsBySend(working)),
     snoozedThreads: snoozed.toSorted(
       (left, right) =>
         firstValidTimestampMs(left.snoozedUntil ?? null) -
         firstValidTimestampMs(right.snoozedUntil ?? null),
     ),
-    settledThreads: sortSettledThreads(settled),
+    settledThreads: nest(sortSettledThreads(settled)),
     visibleThreads: visible,
     snoozeNow: preciseNow,
   };
@@ -898,8 +915,22 @@ function readRouteThreadKey(router: AnyRouter): string | null {
   return ref === null ? null : scopedThreadKey(ref);
 }
 
+const NEEDS_ME_ONLY_KEY = "t3code:sidebar:needs-me-only";
+const NO_LOCAL_VISITS: Readonly<Record<string, string>> = {};
+
 export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
   const terms = useWorkspaceTerms();
+  const ceoModeEnabled = useClientSettings((s) => s.ceoModeEnabled);
+  const [needsMeOnlySetting, setNeedsMeOnly] = useLocalStorage(
+    NEEDS_ME_ONLY_KEY,
+    false,
+    Schema.Boolean,
+  );
+  const needsMeOnly = ceoModeEnabled && needsMeOnlySetting;
+  // Only CEO mode reads every visit; elsewhere rows subscribe to their own.
+  const localVisitedAtByKey = useUiStateStore((store) =>
+    ceoModeEnabled ? store.threadLastVisitedAtById : NO_LOCAL_VISITS,
+  );
   const {
     projects,
     serverConfigs,
@@ -1302,7 +1333,23 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   );
 
+  const needsMeKeys = new Set(
+    ceoModeEnabled
+      ? filterSidebarV2VisibleThreads(listedThreads, chosenScopeProjectKeys, delegatedUnderParent)
+          .filter((thread) =>
+            threadNeedsMe({
+              ...thread,
+              lastVisitedAt: resolveThreadLastVisitedAt(
+                thread.lastVisitedAt,
+                localVisitedAtByKey[threadShellKey(thread)],
+              ),
+            }),
+          )
+          .map(threadShellKey)
+      : [],
+  );
   const {
+    nestedKeys,
     workingShelfEnabled,
     pinnedThreads,
     draggableThreadKeys,
@@ -1344,7 +1391,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
-    threads: listedThreads,
+    threads: needsMeOnly
+      ? listedThreads.filter(
+          (thread) =>
+            needsMeKeys.has(threadShellKey(thread)) || threadShellKey(thread) === routeRowThreadKey,
+        )
+      : listedThreads,
     delegatedUnderParent,
     routeRowThreadKey,
     folderGroups: boringSidebarEnabled
@@ -2744,7 +2796,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             if (result._tag === "Success") {
               toastManager.add({
                 type: "success",
-                title: "Project created",
+                title: `${terms.One} created`,
                 description: thread.title,
               });
             } else if (!isAtomCommandInterrupted(result)) {
@@ -2752,7 +2804,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "Could not turn thread into a project",
+                  title: `Could not turn thread into a ${terms.one}`,
                   description: error instanceof Error ? error.message : "An error occurred.",
                 }),
               );
@@ -2979,6 +3031,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
               hasProjects={projectGroups.length > 0}
+              needsMe={
+                ceoModeEnabled
+                  ? {
+                      active: needsMeOnly,
+                      count: needsMeKeys.size,
+                      onToggle: () => setNeedsMeOnly(!needsMeOnly),
+                    }
+                  : null
+              }
               projectScope={
                 <Combobox
                   items={projectScopeItems}
@@ -3348,6 +3409,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               optimisticDrop !== null
                             }
                             thread={thread}
+                            nested={nestedKeys.has(threadKey)}
                             variant={rowVariant}
                             navigationParent={
                               folderRow ??
@@ -3644,6 +3706,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     Add {terms.one}
                   </button>
                 </>
+              ) : needsMeOnly ? (
+                "Nothing needs you right now"
               ) : scopedProjectGroups.length > 1 ? (
                 `No threads in these ${terms.many} yet`
               ) : scopedProjectGroups[0] ? (

@@ -33,6 +33,7 @@ import {
   resolveAssistantMessageCopyState,
   type MessagesTimelineRow,
   workEntryDisplayLabel,
+  plainWorkEntryLabel,
 } from "./MessagesTimeline.logic";
 
 describe("resolveAssistantMessageCopyState", () => {
@@ -4722,5 +4723,31 @@ describe("shouldCollapseUserMessage", () => {
 
     expect(shouldCollapseUserMessage(`${citation} Can you expand on this?`)).toBe(false);
     expect(shouldCollapseUserMessage(`${citation} ${"More text. ".repeat(60)}`)).toBe(true);
+  });
+});
+
+describe("plainWorkEntryLabel", () => {
+  const entry = (fields: Record<string, unknown>) =>
+    ({
+      id: "work",
+      createdAt: "2026-01-01T00:00:00Z",
+      label: "Tool",
+      tone: "tool",
+      toolLifecycleStatus: "completed",
+      ...fields,
+    }) as never;
+
+  it("words code tools by what they did and leaves other tools alone", () => {
+    expect(
+      plainWorkEntryLabel(
+        entry({ itemType: "command_execution", label: "Ran command", command: "git status" }),
+      ),
+    ).toBe("Ran a command");
+    expect(
+      plainWorkEntryLabel(
+        entry({ itemType: "file_change", label: "Changed files", changedFiles: ["a.ts", "b.ts"] }),
+      ),
+    ).toBe("Changed 2 files");
+    expect(plainWorkEntryLabel(entry({ itemType: "reasoning", detail: "Hmm" }))).toBeNull();
   });
 });

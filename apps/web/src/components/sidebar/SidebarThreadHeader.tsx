@@ -1,4 +1,4 @@
-import { FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { FolderPlusIcon, InboxIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -16,6 +16,8 @@ import { useWorkspaceTerms } from "../../hooks/useWorkspaceTerms";
 export interface SidebarThreadHeaderProps {
   hasProjects: boolean;
   projectScope: ReactNode;
+  /** CEO mode's filter to threads waiting on the user; null hides it. */
+  needsMe: { active: boolean; count: number; onToggle: () => void } | null;
   onNewProject: () => void;
   onNewThread: (event: ReactMouseEvent) => void;
   newThreadDisabled: boolean;
@@ -35,6 +37,7 @@ export interface SidebarThreadHeaderProps {
 export function SidebarThreadHeader({
   hasProjects,
   projectScope,
+  needsMe,
   onNewProject,
   onNewThread,
   newThreadDisabled,
@@ -99,6 +102,21 @@ export function SidebarThreadHeader({
         ) : null}
       </div>
       <div className="flex shrink-0 items-center">
+        {needsMe ? (
+          <SidebarHeaderIconButton
+            label={needsMe.active ? "Show all threads" : `Needs me (${needsMe.count})`}
+            aria-pressed={needsMe.active}
+            onClick={needsMe.onToggle}
+            isActive={needsMe.active}
+          >
+            <InboxIcon />
+            {needsMe.count > 0 ? (
+              <span className="pointer-events-none absolute right-0.5 top-0.5 min-w-3.5 rounded-full bg-primary px-0.5 text-center text-3xs leading-3.5 font-semibold text-primary-foreground tabular-nums">
+                {needsMe.count > 99 ? "99+" : needsMe.count}
+              </span>
+            ) : null}
+          </SidebarHeaderIconButton>
+        ) : null}
         {hasProjects ? (
           <>
             {projectScope}
@@ -145,7 +163,7 @@ export function SidebarHeaderIconButton({
   children?: ReactNode;
 } & Omit<
   ComponentProps<typeof SidebarMenuButton>,
-  "children" | "className" | "tooltip" | "isActive" | "aria-label"
+  "children" | "className" | "tooltip" | "aria-label"
 >) {
   return (
     <Tooltip>

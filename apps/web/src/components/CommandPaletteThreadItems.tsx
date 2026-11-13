@@ -12,7 +12,7 @@ import {
   pickedQuery,
   rankMessageMatches,
 } from "@t3tools/shared/paletteSearch";
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId, ScopedProjectRef, ThreadId } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate } from "@tanstack/react-router";
 import { MessageSquareIcon } from "lucide-react";
@@ -24,6 +24,7 @@ import {
   type ProviderInstanceEntry,
 } from "../providerInstances";
 import { useVisibleThreadShells } from "../state/entities";
+import { useClientSettings } from "../hooks/useSettings";
 import {
   useEnvironmentProviders,
   useEnvironments,
@@ -66,7 +67,7 @@ function useProviderEntryByEnvironmentAndInstanceId() {
   );
 }
 
-function useConnectedThreadSearch(query: string) {
+function useConnectedThreadSearch(query: string, projectIds: ReadonlyArray<ProjectId> | null) {
   const { environments } = useEnvironments();
   const { projectEnvironmentLocationById } = useEnvironmentLookups();
   const environmentIds: ReadonlyArray<EnvironmentId> = environments
@@ -82,11 +83,10 @@ function useConnectedThreadSearch(query: string) {
           }),
         )
       : undefined;
-  return useThreadSearch(
-    environmentIds,
-    query,
-    environmentLabels === undefined ? {} : { environmentLabels },
-  );
+  return useThreadSearch(environmentIds, query, {
+    ...(environmentLabels === undefined ? {} : { environmentLabels }),
+    ...(projectIds === null ? {} : { projectIds }),
+  });
 }
 
 /**
@@ -96,15 +96,31 @@ function useConnectedThreadSearch(query: string) {
 export function useCommandPaletteThreadItems(input: {
   readonly activeThread: { readonly environmentId: EnvironmentId; readonly id: ThreadId } | null;
   readonly threadSearchQuery: string;
+  /** Limits the threads to these projects; null searches them all. */
+  readonly projectRefs: ReadonlyArray<ScopedProjectRef> | null;
 }) {
-  const { activeThread, threadSearchQuery } = input;
+  const { activeThread, threadSearchQuery, projectRefs } = input;
   const navigate = useNavigate();
-  const threads = useVisibleThreadShells();
+  const visibleThreads = useVisibleThreadShells();
+  const projectKeys =
+    projectRefs === null
+      ? null
+      : new Set(projectRefs.map((ref) => `${ref.environmentId}:${ref.projectId}`));
+  const threads =
+    projectKeys === null
+      ? visibleThreads
+      : visibleThreads.filter((thread) =>
+          projectKeys.has(`${thread.environmentId}:${thread.projectId}`),
+        );
   const { projectEnvironmentLocationById } = useEnvironmentLookups();
   const providerEntryByEnvironmentAndInstanceId = useProviderEntryByEnvironmentAndInstanceId();
-  const messageSearch = useConnectedThreadSearch(threadSearchQuery);
+  const messageSearch = useConnectedThreadSearch(
+    threadSearchQuery,
+    projectRefs === null ? null : projectRefs.map((ref) => ref.projectId),
+  );
   const { projectByKey } = useProjectLookups();
   const visitThread = useAtomCommand(threadEnvironment.visit, { reportFailure: false });
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   // Ranking is relative to when the palette opened, so rows do not reorder as time passes.
   const [now] = useState(() => Date.now());
 
@@ -144,8 +160,8 @@ export function useCommandPaletteThreadItems(input: {
           environmentLabel={
             projectEnvironmentLocationById.get(thread.environmentId)?.label ?? "Remote"
           }
-          branch={thread.branch}
-          worktreePath={thread.worktreePath}
+          branch={ceoModeEnabled ? null : thread.branch}
+          worktreePath={ceoModeEnabled ? null : thread.worktreePath}
           isCurrent={
             thread.id === activeThread?.id && thread.environmentId === activeThread.environmentId
           }

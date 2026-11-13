@@ -273,11 +273,14 @@ export function useThreadActionMenu(input: {
           if (result._tag === "Success") {
             toastManager.add({
               type: "success",
-              title: "Project created",
+              title: `${terms.One} created`,
               description: thread.title,
             });
           } else if (!isAtomCommandInterrupted(result)) {
-            failureToast("Could not turn thread into a project", squashAtomCommandFailure(result));
+            failureToast(
+              `Could not turn thread into a ${terms.one}`,
+              squashAtomCommandFailure(result),
+            );
           }
           return;
         }

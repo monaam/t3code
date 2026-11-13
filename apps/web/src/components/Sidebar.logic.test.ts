@@ -16,6 +16,8 @@ import {
   resolveSidebarSweepKeys,
   resolveSidebarThreadStatus,
   resolveThreadStatusPill,
+  threadNeedsMe,
+  nestLaunchedThreads,
   resolveWorkingStartedAt,
   searchSidebarThreads,
   shouldRecedeSidebarThread,
@@ -550,6 +552,17 @@ describe("resolveThreadStatusPill", () => {
         },
       }),
     ).toBeNull();
+  });
+
+  it("counts a thread as needing the user unless it is working or already read", () => {
+    const idle = { ...baseThread, interactionMode: "default" as const, runtime: null };
+    const finished = { ...idle, latestRun: makeLatestRun() };
+    expect(threadNeedsMe({ ...idle, hasPendingApprovals: true })).toBe(true);
+    expect(threadNeedsMe(finished)).toBe(true);
+    expect(threadNeedsMe({ ...finished, lastVisitedAt: "2026-03-09T10:04:00.000Z" })).toBe(true);
+    expect(threadNeedsMe({ ...finished, lastVisitedAt: "2026-03-09T10:06:00.000Z" })).toBe(false);
+    expect(threadNeedsMe(baseThread)).toBe(false);
+    expect(threadNeedsMe(idle)).toBe(false);
   });
 });
 
@@ -1653,5 +1666,32 @@ describe("shouldCreateNewThreadInCurrentProject", () => {
     expect(shouldCreateNewThreadInCurrentProject(false, 1, 3)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(false, 0, 0)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(true, 2, 2)).toBe(true);
+  });
+});
+
+describe("nestLaunchedThreads", () => {
+  const thread = (id: string, launchedBy: string | null = null) => ({
+    environmentId: "env" as never,
+    id: id as never,
+    launchedByThreadId: launchedBy as never,
+  });
+  const keyOf = (t: { id: string }) => t.id;
+
+  it("lists launched threads under their launcher, deepest last", () => {
+    const { threads, nested } = nestLaunchedThreads(
+      [thread("side-a", "daily"), thread("other"), thread("daily"), thread("deep", "side-a")],
+      keyOf,
+    );
+    expect(threads.map(keyOf)).toEqual(["other", "daily", "side-a", "deep"]);
+    expect([...nested].toSorted()).toEqual(["deep", "side-a"]);
+  });
+
+  it("keeps a thread in place when its launcher is not listed or the launches loop", () => {
+    expect(
+      nestLaunchedThreads([thread("a", "gone"), thread("b")], keyOf).threads.map(keyOf),
+    ).toEqual(["a", "b"]);
+    expect(
+      nestLaunchedThreads([thread("a", "b"), thread("b", "a")], keyOf).threads.map(keyOf),
+    ).toEqual(["a", "b"]);
   });
 });

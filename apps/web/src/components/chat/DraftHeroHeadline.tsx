@@ -304,7 +304,9 @@ export function DraftHeroHeadline({
           }
         >
           <DraftProjectName
-            value={isScratchDraft ? "No project" : (activeProjectTitle ?? "Choose a project")}
+            value={
+              isScratchDraft ? `No ${terms.one}` : (activeProjectTitle ?? `Choose a ${terms.one}`)
+            }
             singleLine
           />
         </TooltipTrigger>
@@ -373,7 +375,7 @@ export function DraftHeroHeadline({
       onClick={openAddProject}
       className="pointer-events-auto inline min-w-0 max-w-full cursor-pointer border-muted-foreground/35 border-b border-dotted text-muted-foreground/60 transition-colors hover:border-muted-foreground/60 hover:text-muted-foreground/80 focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
-      <DraftProjectName value={activeProjectTitle ?? "Add a project"} singleLine />
+      <DraftProjectName value={activeProjectTitle ?? `Add a ${terms.one}`} singleLine />
     </button>
   );
 
@@ -417,7 +419,7 @@ export function DraftHeroHeadline({
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
       {hasResolvedProject && !isScratchDraft ? (
-        <DraftHeroProjectHeading projectName={activeProjectTitle ?? "Choose a project"}>
+        <DraftHeroProjectHeading projectName={activeProjectTitle ?? `Choose a ${terms.one}`}>
           {projectSelector}
         </DraftHeroProjectHeading>
       ) : (

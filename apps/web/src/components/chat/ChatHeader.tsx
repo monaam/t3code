@@ -4,6 +4,7 @@ import {
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
+import { useWorkspaceTerms } from "../../hooks/useWorkspaceTerms";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import {
@@ -82,7 +83,8 @@ export const ChatHeader = memo(function ChatHeader({
   onOpenProjectSettings,
   onFindInThread,
 }: ChatHeaderProps) {
-  const activeProjectName = activeProject?.isScratch ? "No project" : activeProject?.title;
+  const terms = useWorkspaceTerms();
+  const activeProjectName = activeProject?.isScratch ? `No ${terms.one}` : activeProject?.title;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const interfaceFont = useClientSettings((settings) => settings.fontFamilySans);
   const breadcrumbContainerRef = useRef<HTMLDivElement>(null);
@@ -223,7 +225,7 @@ export const ChatHeader = memo(function ChatHeader({
       const api = readLocalApi();
       if (!api) return;
       void api.contextMenu
-        .show([{ id: "project-settings", label: "Project settings", icon: "settings" }], {
+        .show([{ id: "project-settings", label: `${terms.One} settings`, icon: "settings" }], {
           x: event.clientX,
           y: event.clientY,
         })

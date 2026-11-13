@@ -119,6 +119,7 @@ import { Kbd } from "../ui/kbd";
 import { Menu, MenuItem, MenuItemDetail, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { MiddleTruncate } from "../ui/middle-truncate";
+import { useClientSettings } from "../../hooks/useSettings";
 import { useThreadHasUnsentDraft } from "../../composerDraftStore";
 
 // The fields thread rows show. Provider status pushes refresh `checkedAt`,
@@ -262,6 +263,7 @@ function SidebarThreadTooltip({
   terminalProcessCount: number;
 }) {
   const driverKind = providerEntry?.driverKind ?? null;
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   const previousProviderNames = thread.providerInstanceHistory
     .filter((instanceId) => instanceId !== modelInstanceId)
     .map((instanceId) => providerEntryByInstanceId.get(instanceId)?.displayName ?? instanceId);
@@ -293,13 +295,13 @@ function SidebarThreadTooltip({
             <div className="min-w-0 truncate text-foreground/75">{environmentLabel}</div>
           </div>
         ) : null}
-        {thread.branch ? (
+        {thread.branch && !ceoModeEnabled ? (
           <div className="flex min-w-0 items-center gap-2">
             <GitBranchIcon className="size-3 shrink-0 stroke-muted-foreground" />
             <MiddleTruncate value={thread.branch} className="flex" />
           </div>
         ) : null}
-        {branchMismatch ? (
+        {branchMismatch && !ceoModeEnabled ? (
           <div className="flex min-w-0 items-start gap-2 text-warning">
             <CircleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0 stroke-current" />
             <div className="min-w-0 flex-1 wrap-break-word">
@@ -543,6 +545,8 @@ function TopStatusIcon(props: { icon: keyof typeof TOP_STATUS_ICONS; className: 
 
 type SidebarThreadRowProps = {
   thread: SidebarThreadSummary;
+  /** Listed under the thread that launched it. */
+  nested?: boolean;
   // "folder" is a one-line row inside a boring sidebar project folder;
   // "folder-multiline" adds the card's branch and PR line under it.
   variant: "card" | "slim" | "folder" | "folder-multiline";
@@ -819,7 +823,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     : thread.modelSelection.model;
 
   const isRemote = thread.environmentId !== props.currentEnvironmentId;
-  const showsScratchMachine = !thread.branch && props.scratchMachineLabel !== null;
+  // CEO mode shows no branch, diff, pull request, or terminal on the row.
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
+  const branchLabel = ceoModeEnabled ? null : thread.branch;
+  const showsScratchMachine = !branchLabel && props.scratchMachineLabel !== null;
 
   const detailsTooltip = (
     <SidebarThreadTooltip
@@ -1072,7 +1079,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     if (!props.isRouteThread) onThreadActivate(threadRef);
   };
   const prBadge =
-    prBadgeShape?.kind === "stack" || pr || currentLinkedPr ? (
+    !ceoModeEnabled && (prBadgeShape?.kind === "stack" || pr || currentLinkedPr) ? (
       <ThreadPullRequestBadgeControl
         render={<InlineButton />}
         badge={prBadgeShape}
@@ -1149,21 +1156,21 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         <EnvironmentMachineIcon aria-hidden kind={props.environmentMachine} className="size-3.5" />
       </span>
     ) : null;
-  const diff = latestRunDiff(thread);
+  const diff = ceoModeEnabled ? null : latestRunDiff(thread);
   // Only the trailing icons would remain, so the row moves them to the title line instead.
   const metaLineEmpty =
-    !thread.branch &&
+    !branchLabel &&
     !showsScratchMachine &&
     prBadge === null &&
     diff === null &&
     runningTerminalIds.length === 0;
   const metaLine = metaLineEmpty ? null : (
     <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-secondary-label text-xs">
-      {thread.branch ? (
+      {branchLabel ? (
         <>
           <ThreadWorktreeIndicator thread={thread} />
           <span className="flex min-w-0 flex-1">
-            <MiddleTruncate value={thread.branch} showTitle={false} />
+            <MiddleTruncate value={branchLabel} showTitle={false} />
           </span>
         </>
       ) : showsScratchMachine ? (
@@ -1218,6 +1225,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         {...(fileDropHandlers ?? {})}
         className={cn(
           "list-none [content-visibility:auto] [contain-intrinsic-size:auto_--spacing(9)]",
+          props.nested && "ps-4",
           metaLine !== null && multiline && "[contain-intrinsic-size:auto_--spacing(13.5)]",
           sortable?.isDragging && "relative z-20",
         )}
@@ -1414,6 +1422,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       {...(fileDropHandlers ?? {})}
       className={cn(
         "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_78px]",
+        props.nested && "ps-4",
         metaLineEmpty && "[contain-intrinsic-size:auto_58px]",
         sortable?.isDragging && "relative z-20",
       )}

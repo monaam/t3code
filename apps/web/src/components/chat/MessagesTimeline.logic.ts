@@ -182,6 +182,29 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
   return `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`;
 }
 
+/**
+ * CEO mode's wording for a code tool: what happened, without commands or paths.
+ * Null leaves the usual label, which T3 and integration tools already word plainly.
+ */
+export function plainWorkEntryLabel(entry: WorkLogEntry): string | null {
+  if (entry.itemType === "reasoning" || entry.itemType === "system_notice") return null;
+  if (resolveWorkEntryToolPresentation(entry)) return null;
+  const action = toolGroupAction(entry);
+  const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+  switch (action) {
+    case "command":
+      return "Ran a command";
+    case "edit":
+      return `Changed ${plural(Math.max(1, entry.changedFiles?.length ?? 0), "file")}`;
+    case "read":
+      return `Read ${plural(Math.max(1, workEntryReadRawPaths(entry).length), "file")}`;
+    case "code-search":
+      return "Searched files";
+    default:
+      return null;
+  }
+}
+
 export function threadReadTargetId(entry: Pick<WorkLogEntry, "structuredPayload">) {
   const item = entry.structuredPayload;
   if (item?.type !== "dynamic_tool") return null;

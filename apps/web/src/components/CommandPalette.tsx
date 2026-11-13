@@ -108,7 +108,7 @@ import {
   promptLinkRepositoryOf,
 } from "./promptLinks/copyPromptLink";
 import { useClientSettings } from "../hooks/useSettings";
-import { workspaceTermsFor } from "../workspaceTerms";
+import { type WorkspaceTerms, workspaceTermsFor } from "../workspaceTerms";
 import { useStableCallback } from "../hooks/useStableCallback";
 import { readLocalApi } from "../localApi";
 import { configuredHostedAppUrl } from "../hostedPairing";
@@ -275,7 +275,10 @@ const ADD_PROJECT_ENTRY_GROUP = "add-project";
 const NEW_THREAD_IN_GROUP = "projects";
 
 /** The submenu an open intent starts in; its groups resolve while rendering. */
-function openIntentView(intent: CommandPaletteOpenIntent | null): CommandPaletteView | null {
+function openIntentView(
+  intent: CommandPaletteOpenIntent | null,
+  terms: WorkspaceTerms,
+): CommandPaletteView | null {
   switch (intent?.kind) {
     case "add-project":
       return {
@@ -285,7 +288,7 @@ function openIntentView(intent: CommandPaletteOpenIntent | null): CommandPalette
     case "new-thread-in":
       return {
         addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-        groups: [{ value: NEW_THREAD_IN_GROUP, label: "Projects", items: [] }],
+        groups: [{ value: NEW_THREAD_IN_GROUP, label: terms.Many, items: [] }],
       };
     case "change-theme":
       return {
@@ -422,8 +425,10 @@ function OpenCommandPaletteDialog(props: {
   const linkedEnvironmentId = linkedThreadSearch?.linkedThreads?.environmentId ?? null;
   const hidingAnywhere = useAnyEnvironmentHiding();
   const linkedThreadRefs = useEnvironmentThreadRefs(linkedEnvironmentId);
+  const clientSettings = useClientSettings(selectCommandPaletteClientSettings);
+  const terms = workspaceTermsFor(clientSettings.ceoModeEnabled);
   const [searchState, dispatchSearch] = useReducer(reduceCommandPaletteSearchState, null, () => {
-    const view = props.initialContext ? null : openIntentView(props.openIntent);
+    const view = props.initialContext ? null : openIntentView(props.openIntent, terms);
     return view
       ? { query: "", views: [{ view, parentQuery: "" }] }
       : createCommandPaletteSearchState(initialSearch.query);
@@ -442,8 +447,6 @@ function OpenCommandPaletteDialog(props: {
     highlightClearedRef.current = true;
     setHighlightedItemValue(null);
   }
-  const clientSettings = useClientSettings(selectCommandPaletteClientSettings);
-  const terms = workspaceTermsFor(clientSettings.ceoModeEnabled);
   const createProject = useAtomCommand(projectEnvironment.create, {
     reportFailure: false,
   });
@@ -520,6 +523,7 @@ function OpenCommandPaletteDialog(props: {
     null,
   );
   const [isPickingProjectFolder, setIsPickingProjectFolder] = useState(false);
+  const [searchAllProjects, setSearchAllProjects] = useState(false);
   const [addProjectCloneFlow, setAddProjectCloneFlow] = useState<AddProjectCloneFlow | null>(null);
   const [newProjectFlow, setNewProjectFlow] = useState<{
     readonly environmentId: EnvironmentId;
@@ -699,6 +703,21 @@ function OpenCommandPaletteDialog(props: {
   const canTriage =
     useAtomValue(serverEnvironment.prepareTriage.permissionAtom(triageEnvironmentId)) &&
     supportsTriage(triageEnvironmentId);
+  // CEO mode searches the open workspace first; the footer widens it.
+  const searchProjectGroup =
+    clientSettings.ceoModeEnabled && currentProjectId !== null
+      ? (projectGroups.find((group) =>
+          group.memberProjectRefs.some(
+            (ref) =>
+              ref.environmentId === currentProjectEnvironmentId &&
+              ref.projectId === currentProjectId,
+          ),
+        ) ?? null)
+      : null;
+  const searchScopeGroup =
+    searchProjectGroup !== null && !searchAllProjects && threadSearchQuery.trim().length > 0
+      ? searchProjectGroup
+      : null;
   const currentProject = resolveCommandPaletteProject(
     projectByKey,
     currentProjectEnvironmentId,
@@ -905,7 +924,11 @@ function OpenCommandPaletteDialog(props: {
     threadMessageItems,
     now: searchNow,
     isSearchPending: isThreadSearchPending,
-  } = useCommandPaletteThreadItems({ activeThread: activeThread ?? null, threadSearchQuery });
+  } = useCommandPaletteThreadItems({
+    activeThread: activeThread ?? null,
+    threadSearchQuery,
+    projectRefs: searchScopeGroup?.memberProjectRefs ?? null,
+  });
   // Recent means used recently: written in or opened, whichever is later. The
   // open thread would always lead that list, so it is left out.
   const activeThreadValue = activeThread
@@ -2423,7 +2446,7 @@ function OpenCommandPaletteDialog(props: {
 
   const inputPlaceholder =
     newProjectFlow !== null
-      ? "Project name"
+      ? `${terms.One} name`
       : (remoteProjectInputPlaceholder(addProjectCloneFlow) ??
         getCommandPaletteInputPlaceholder(paletteMode));
   const isSubmenu = paletteMode === "submenu" || paletteMode === "submenu-browse";
@@ -2879,6 +2902,15 @@ function OpenCommandPaletteDialog(props: {
     // In the footer, so the list keeps its height while message results may
     // still arrive below it.
     <span className="text-muted-foreground text-xs">Searching messages…</span>
+  ) : searchProjectGroup !== null &&
+    threadSearchQuery.trim().length > 0 &&
+    !isLinkedThreadSearch &&
+    !isBrowsing ? (
+    <CommandFooterAction onClick={() => setSearchAllProjects(!searchAllProjects)}>
+      {searchAllProjects
+        ? `Only ${searchProjectGroup.displayName}`
+        : `In ${searchProjectGroup.displayName} · Search all ${terms.many}`}
+    </CommandFooterAction>
   ) : null;
 
   return (

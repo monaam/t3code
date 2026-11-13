@@ -1,4 +1,5 @@
 import { isClearComposerCommand, parseSideChatCommand } from "@t3tools/shared/composerTrigger";
+import { useWorkspaceTerms } from "../../hooks/useWorkspaceTerms";
 import { armFreshSession, disarmFreshSession, readFreshSessionArm } from "./freshSessionArms";
 import {
   mergeDirectPreviewAnnotation,
@@ -254,6 +255,7 @@ interface ComposerSendInput {
  * when it fails.
  */
 export function useComposerSend(input: ComposerSendInput) {
+  const terms = useWorkspaceTerms();
   const {
     environmentId,
     routeThreadKey,
@@ -711,8 +713,8 @@ export function useComposerSend(input: ComposerSendInput) {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "Choose a project first",
-          description: "This draft no longer points to an available project.",
+          title: `Choose a ${terms.one} first`,
+          description: `This draft no longer points to an available ${terms.one}.`,
         }),
       );
       return;

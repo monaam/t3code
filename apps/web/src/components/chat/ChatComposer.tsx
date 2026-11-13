@@ -1,4 +1,5 @@
 import { VoiceInputSetup } from "./VoiceInputSetup";
+import { useWorkspaceTerms } from "../../hooks/useWorkspaceTerms";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
 import { insertAttachmentReferencesForDraft } from "./composerAttachmentReferences";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
@@ -488,6 +489,7 @@ const NO_PROVIDER_SKILLS: ServerProvider["skills"] = [];
 const NO_PROVIDER_SLASH_COMMANDS: ServerProvider["slashCommands"] = [];
 
 export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps) {
+  const terms = useWorkspaceTerms();
   const {
     composerDraftTarget,
     environmentId,
@@ -3486,7 +3488,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                             ? "Choose an option above"
                             : "Type your own answer, or leave this blank to use the selected option"
                           : projectSelectionRequired
-                            ? "Choose a project above to start a thread"
+                            ? `Choose a ${terms.one} above to start a thread`
                             : showProviderUnavailable
                               ? "Enable a provider in Settings to send a message"
                               : (offeredPromptSuggestion ?? DEFAULT_COMPOSER_PLACEHOLDER)

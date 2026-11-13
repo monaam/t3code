@@ -573,6 +573,47 @@ export async function deleteSelectedThreadEntries<
   return { deletedThreadKeys, firstFailure };
 }
 
+/**
+ * Moves each thread an agent launched to just below the thread that launched it,
+ * when both are in `threads`; the rest keep their order. Returns the moved keys.
+ */
+export function nestLaunchedThreads<
+  T extends Pick<SidebarThreadSummary, "environmentId" | "id" | "launchedByThreadId">,
+>(threads: readonly T[], keyOf: (thread: T) => string): { threads: T[]; nested: Set<string> } {
+  const parentKeyOf = (thread: T) =>
+    thread.launchedByThreadId === null || thread.launchedByThreadId === thread.id
+      ? null
+      : keyOf({ ...thread, id: thread.launchedByThreadId });
+  const listed = new Set(threads.map(keyOf));
+  const children = new Map<string, T[]>();
+  for (const thread of threads) {
+    const parentKey = parentKeyOf(thread);
+    if (parentKey === null || !listed.has(parentKey)) continue;
+    const siblings = children.get(parentKey);
+    if (siblings) siblings.push(thread);
+    else children.set(parentKey, [thread]);
+  }
+  if (children.size === 0) return { threads: [...threads], nested: new Set() };
+  const ordered: T[] = [];
+  const nested = new Set<string>();
+  const placed = new Set<string>();
+  const place = (thread: T, isChild: boolean) => {
+    const key = keyOf(thread);
+    if (placed.has(key)) return;
+    placed.add(key);
+    ordered.push(thread);
+    if (isChild) nested.add(key);
+    for (const child of children.get(key) ?? []) place(child, true);
+  };
+  for (const thread of threads) {
+    const parentKey = parentKeyOf(thread);
+    if (parentKey === null || !listed.has(parentKey)) place(thread, false);
+  }
+  // A launch cycle has no root; its threads keep their places.
+  for (const thread of threads) place(thread, false);
+  return { threads: ordered, nested };
+}
+
 export function isSidebarHiddenThread(thread: Pick<SidebarThreadSummary, "lineage">): boolean {
   return !isListedThreadLineage(thread.lineage);
 }
@@ -1283,6 +1324,23 @@ export function resolveThreadStatusPill(input: {
   }
 
   return null;
+}
+
+const NEEDS_ME_PILLS: ReadonlySet<ThreadStatusPill["label"]> = new Set([
+  "Pending Approval",
+  "Awaiting Input",
+  "Guest Request",
+  "Failed",
+  "Plan Ready",
+  "Completed",
+]);
+
+/** Waiting on the user: a question, an approval, a failure, or a result not read yet. */
+export function threadNeedsMe(thread: ThreadStatusInput): boolean {
+  const pill = resolveThreadStatusPill({ thread });
+  if (pill !== null) return NEEDS_ME_PILLS.has(pill.label);
+  // The Completed pill skips never-opened threads; an agent-launched one still waits to be read.
+  return !thread.lastVisitedAt && thread.latestRun?.status === "completed";
 }
 
 export function getFallbackThreadIdAfterDelete<

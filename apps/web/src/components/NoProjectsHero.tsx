@@ -1,4 +1,5 @@
 import { workspaceAreaProps } from "../lib/workspaceFocus";
+import { useWorkspaceTerms } from "../hooks/useWorkspaceTerms";
 import { MessageSquareDashedIcon, PlusIcon } from "lucide-react";
 
 import { openCommandPalette } from "../commandPaletteBus";
@@ -11,6 +12,7 @@ import { SidebarInset } from "./ui/sidebar";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
 export function NoProjectsHero() {
+  const terms = useWorkspaceTerms();
   const contentArea = workspaceAreaProps("home", 1, "Home");
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
@@ -31,13 +33,13 @@ export function NoProjectsHero() {
               <EmptyTitle>What should we work on?</EmptyTitle>
               <EmptyDescription>
                 {scratchTargetEnvironmentId === null
-                  ? "Add a project to start your first thread."
-                  : "Add a project, or start without one."}
+                  ? `Add a ${terms.one} to start your first thread.`
+                  : `Add a ${terms.one}, or start without one.`}
               </EmptyDescription>
               <div className="mt-6 flex justify-center gap-2">
                 <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
                   <PlusIcon className="size-4" />
-                  Add project
+                  Add {terms.one}
                 </Button>
                 {scratchTargetEnvironmentId === null ? null : (
                   <Button

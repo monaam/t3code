@@ -36,7 +36,7 @@ import {
 import { ProjectEnvironmentBadge } from "../ProjectEnvironmentBadge";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { isProjectPinShortcut, ProjectPinButton } from "../ProjectPinButton";
-import { sortLogicalProjectsForSidebar } from "../Sidebar.logic";
+import { projectListOrder, sortLogicalProjectsForSidebar } from "../Sidebar.logic";
 import {
   Combobox,
   ComboboxEmpty,
@@ -55,6 +55,7 @@ import { TriageDraftHero } from "./TriageDraftHero";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { resolveProjectDefaultProviderModelSelection } from "../../providerInstances";
 import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
+import { useWorkspaceTerms } from "../../hooks/useWorkspaceTerms";
 
 const ADD_PROJECT_VALUE = "add-project";
 
@@ -74,6 +75,7 @@ export function DraftHeroHeadline({
   activeProjectRef,
   activeProjectTitle,
 }: DraftHeroHeadlineProps) {
+  const terms = useWorkspaceTerms();
   const projects = useProjects();
   const threads = useVisibleThreadShells();
   const { environments } = useEnvironments();
@@ -81,6 +83,7 @@ export function DraftHeroHeadline({
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
   const projectSortOrder = useClientSettings((settings) => settings.sidebarProjectSortOrder);
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   const setLogicalProjectDraftThreadId = useComposerDraftStore(
     (store) => store.setLogicalProjectDraftThreadId,
   );
@@ -112,7 +115,7 @@ export function DraftHeroHeadline({
       resolveEnvironmentLabel: (environmentId) => environmentLabelById.get(environmentId) ?? null,
     }),
     threads,
-    projectSortOrder,
+    projectListOrder(projectSortOrder, ceoModeEnabled),
   );
   const showProjectEnvironments = projectGroupsSpanEnvironments(projectGroups);
   const environmentMachineById = new Map(
@@ -165,7 +168,7 @@ export function DraftHeroHeadline({
   const pickerItems: readonly PickerItem[] = useOrderWhileOpen(
     [
       ...menuEntries.map(({ group }) => ({ value: group.projectKey, label: group.displayName })),
-      { value: ADD_PROJECT_VALUE, label: "Add project" },
+      { value: ADD_PROJECT_VALUE, label: `Add ${terms.one}` },
     ],
     (item) => item.value,
     pickerOpen,
@@ -311,8 +314,8 @@ export function DraftHeroHeadline({
       </Tooltip>
       <ComboboxPopup align="center" className="w-72 overflow-hidden">
         <ComboboxSearchInput
-          aria-label="Search projects"
-          placeholder="Search projects..."
+          aria-label={`Search ${terms.many}`}
+          placeholder={`Search ${terms.many}...`}
           value={pickerQuery}
           onChange={(event) => setPickerQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -326,7 +329,7 @@ export function DraftHeroHeadline({
             toggleProjectGroupPin(group);
           }}
         />
-        <ComboboxEmpty>No matching projects.</ComboboxEmpty>
+        <ComboboxEmpty>No matching {terms.many}.</ComboboxEmpty>
         <ComboboxList>
           {(item: PickerItem) => {
             const entry = projectEntryByKey.get(item.value);
@@ -424,7 +427,7 @@ export function DraftHeroHeadline({
           ) : canChooseProject ? (
             <>{projectSelector} to start</>
           ) : (
-            <>Add a project to start</>
+            <>Add a {terms.one} to start</>
           )}
         </h1>
       )}

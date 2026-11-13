@@ -23,7 +23,23 @@ type ThreadDetailsItem = (typeof THREAD_DETAILS_ITEMS)[number];
 type ThreadDetailsItemSettings = Pick<
   ClientSettings,
   "threadDetailsItems" | "threadDetailsUsageEnabled"
->;
+> &
+  Partial<Pick<ClientSettings, "ceoModeEnabled">>;
+
+const CODE_ONLY_ITEMS: ReadonlySet<ThreadDetailsItemId> = new Set([
+  "openIn",
+  "scripts",
+  "branch",
+  "gitActions",
+  "changes",
+]);
+
+/** The items a person can show; CEO mode drops the code-only ones. */
+export function threadDetailsItemsFor(ceoModeEnabled: boolean) {
+  return ceoModeEnabled
+    ? THREAD_DETAILS_ITEMS.filter((item) => !CODE_ONLY_ITEMS.has(item.id))
+    : THREAD_DETAILS_ITEMS;
+}
 
 // People who turned on the retired Labs toggle keep Usage and Context until they change them here.
 function defaultVisible(item: ThreadDetailsItem, settings: ThreadDetailsItemSettings) {
@@ -38,7 +54,8 @@ export function resolveThreadDetailsVisibility(
   return Object.fromEntries(
     THREAD_DETAILS_ITEMS.map((item) => [
       item.id,
-      settings.threadDetailsItems[item.id] ?? defaultVisible(item, settings),
+      !(settings.ceoModeEnabled && CODE_ONLY_ITEMS.has(item.id)) &&
+        (settings.threadDetailsItems[item.id] ?? defaultVisible(item, settings)),
     ]),
   ) as Record<ThreadDetailsItemId, boolean>;
 }
@@ -53,8 +70,11 @@ export function setThreadDetailsItem(
   return visible === defaultVisible(item, settings) ? rest : { ...rest, [item.id]: visible };
 }
 
-export function isDefaultThreadDetailsVisibility(visibility: ThreadDetailsVisibility) {
-  return THREAD_DETAILS_ITEMS.every((item) => visibility[item.id] === item.defaultVisible);
+export function isDefaultThreadDetailsVisibility(
+  visibility: ThreadDetailsVisibility,
+  items: ReadonlyArray<ThreadDetailsItem> = THREAD_DETAILS_ITEMS,
+) {
+  return items.every((item) => visibility[item.id] === item.defaultVisible);
 }
 
 /** Also clears the retired Labs flag, so Usage and Context return to off. */

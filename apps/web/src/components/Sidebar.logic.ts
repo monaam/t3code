@@ -1338,14 +1338,27 @@ function getProjectSortTimestamp(
   return toSortableTimestamp(project.updatedAt ?? project.createdAt) ?? Number.NEGATIVE_INFINITY;
 }
 
+/** CEO mode lists projects by name; it is not a stored setting. */
+export type ProjectListOrder = SidebarProjectSortOrder | "name";
+
+export function projectListOrder(
+  sortOrder: SidebarProjectSortOrder,
+  ceoModeEnabled: boolean,
+): ProjectListOrder {
+  return ceoModeEnabled ? "name" : sortOrder;
+}
+
 function sortProjectsByActivity<TProject extends SidebarProject>(
   projects: readonly TProject[],
-  sortOrder: SidebarProjectSortOrder,
+  sortOrder: ProjectListOrder,
   getProjectThreads: (project: TProject) => readonly ThreadSortInput[],
   compareTies: (left: TProject, right: TProject) => number,
 ): TProject[] {
   if (sortOrder === "manual") {
     return [...projects];
+  }
+  if (sortOrder === "name") {
+    return projects.toSorted(compareTies);
   }
 
   // Project timestamps scan all threads; compute once per project instead of per comparison.
@@ -1368,7 +1381,7 @@ export function sortLogicalProjectsForSidebar<
 >(
   projects: readonly TProject[],
   threads: readonly TThread[],
-  sortOrder: SidebarProjectSortOrder,
+  sortOrder: ProjectListOrder,
 ): TProject[] {
   const groupKeyByProjectRef = new Map(
     projects.flatMap((project) =>
@@ -1407,7 +1420,7 @@ export function sortSidebarV2ProjectGroups<
 >(
   projects: readonly TProject[],
   threads: readonly TThread[],
-  sortOrder: SidebarProjectSortOrder,
+  sortOrder: ProjectListOrder,
   delegatedUnderParent: ReadonlySet<string>,
 ): TProject[] {
   return sortLogicalProjectsForSidebar(

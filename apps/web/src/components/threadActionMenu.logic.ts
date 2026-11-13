@@ -1,5 +1,6 @@
 import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
+import { type WorkspaceTerms, workspaceTermsFor } from "../workspaceTerms";
 
 export type ThreadActionMenuId =
   | "find"
@@ -40,7 +41,9 @@ export function buildDraftActionMenuItems(options: {
   readonly hasPath: boolean;
   readonly hasBranch: boolean;
   readonly hasProject: boolean;
+  readonly terms?: WorkspaceTerms;
 }): ReadonlyArray<ContextMenuItem<DraftActionMenuId>> {
+  const terms = options.terms ?? workspaceTermsFor(false);
   return [
     {
       id: "copy",
@@ -55,7 +58,7 @@ export function buildDraftActionMenuItems(options: {
       ],
     },
     ...(options.hasProject
-      ? [{ id: "project-settings" as const, label: "Project settings", icon: "settings" }]
+      ? [{ id: "project-settings" as const, label: `${terms.One} settings`, icon: "settings" }]
       : []),
     {
       id: "discard",
@@ -95,6 +98,7 @@ export interface ThreadActionMenuState {
   readonly canShareWithGuest?: boolean;
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
+  readonly terms?: WorkspaceTerms;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
@@ -116,6 +120,7 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
 export function buildThreadActionMenuItems(
   state: ThreadActionMenuState,
 ): ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> {
+  const terms = state.terms ?? workspaceTermsFor(false);
   const items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> = [
     ...(state.canFind
       ? [{ id: "find" as const, label: "Find in thread", icon: "text-search" }]
@@ -187,7 +192,7 @@ export function buildThreadActionMenuItems(
           {
             id: "filter-by-project" as const,
             label: state.projectFilter.isActive
-              ? "Show all projects"
+              ? `Show all ${terms.many}`
               : `Filter by ${state.projectFilter.label}`,
             icon: "folder-tree",
           },
@@ -197,7 +202,7 @@ export function buildThreadActionMenuItems(
       ? [
           {
             id: "turn-into-project" as const,
-            label: "Turn into project",
+            label: `Turn into ${terms.one}`,
             icon: "folder-plus",
             disabled: state.isRunning,
           },
@@ -238,7 +243,7 @@ export function buildThreadActionMenuItems(
         { id: "copy-thread-id", label: "Thread ID", icon: "hash" },
       ],
     },
-    { id: "project-settings", label: "Project settings", icon: "settings" },
+    { id: "project-settings", label: `${terms.One} settings`, icon: "settings" },
     {
       id: "archive",
       label: "Archive thread",

@@ -1,4 +1,8 @@
-import { orderItemsByPreferredIds, sortSidebarV2ProjectGroups } from "../components/Sidebar.logic";
+import {
+  orderItemsByPreferredIds,
+  projectListOrder,
+  sortSidebarV2ProjectGroups,
+} from "../components/Sidebar.logic";
 import {
   getProjectOrderKey,
   selectProjectGroupingSettings,
@@ -17,6 +21,7 @@ export function useSidebarProjectGroups() {
   const delegatedUnderParent = useDelegatedUnderParent();
   const projectOrder = useUiStateStore((store) => store.projectOrder);
   const sortOrder = useClientSettings((s) => s.sidebarProjectSortOrder);
+  const ceoModeEnabled = useClientSettings((s) => s.ceoModeEnabled);
   const groupingSettings = useClientSettings(selectProjectGroupingSettings);
   const environments = useEnvironmentIdentities();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -39,5 +44,10 @@ export function useSidebarProjectGroups() {
     primaryEnvironmentId,
     resolveEnvironmentLabel: (environmentId) => labels.get(environmentId) ?? null,
   });
-  return sortSidebarV2ProjectGroups(unsortedGroups, threads, sortOrder, delegatedUnderParent);
+  return sortSidebarV2ProjectGroups(
+    unsortedGroups,
+    threads,
+    projectListOrder(sortOrder, ceoModeEnabled),
+    delegatedUnderParent,
+  );
 }

@@ -162,6 +162,24 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   },
 ];
 
+const CEO_MODE_HIDDEN_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set([
+  "/settings/diffs",
+  "/settings/source-control",
+  "/settings/worktrees",
+]);
+
+export function isSettingsPathShown(to: SettingsPath, ceoModeEnabled: boolean) {
+  return !ceoModeEnabled || !CEO_MODE_HIDDEN_SETTINGS_PATHS.has(to);
+}
+
+export function settingsNavGroupsFor(ceoModeEnabled: boolean) {
+  if (!ceoModeEnabled) return SETTINGS_NAV_GROUPS;
+  return SETTINGS_NAV_GROUPS.map((group) => ({
+    heading: group.heading === "Code" ? "Workspaces" : group.heading,
+    paths: group.paths.filter((to) => isSettingsPathShown(to, true)),
+  })).filter((group) => group.paths.length > 0);
+}
+
 export function keybindingSearchAnchorId<Command extends KeybindingCommand>(command: Command) {
   return `keybinding-${command}` as const;
 }
@@ -671,6 +689,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Thread notifications",
     to: "/settings/general",
     searchTerms: ["notification sound alert completion input approval desktop"],
+  },
+  {
+    id: "ceo-mode",
+    title: "CEO mode",
+    to: "/settings/general",
+    searchTerms: ["business non-coding hide code terminal diff git branch worktree editor simple"],
   },
   {
     id: "in-app-notifications",

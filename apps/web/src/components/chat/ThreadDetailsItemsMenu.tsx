@@ -9,17 +9,18 @@ import {
   resolveThreadDetailsVisibility,
   RESET_THREAD_DETAILS_ITEMS,
   setThreadDetailsItem,
-  THREAD_DETAILS_ITEMS,
+  threadDetailsItemsFor,
 } from "./threadDetailsItems";
 
 /** Menu body that shows and hides thread details items. The card's context menu and Settings share it. */
 export function ThreadDetailsItemsMenuItems() {
   const visibility = useClientSettings(resolveThreadDetailsVisibility);
+  const items = threadDetailsItemsFor(useClientSettings((settings) => settings.ceoModeEnabled));
   return (
     <>
       <MenuGroup>
         <MenuGroupLabel>Show in thread details</MenuGroupLabel>
-        {THREAD_DETAILS_ITEMS.map((item) => (
+        {items.map((item) => (
           <MenuCheckboxItem
             key={item.id}
             checked={visibility[item.id]}
@@ -35,7 +36,7 @@ export function ThreadDetailsItemsMenuItems() {
       </MenuGroup>
       <MenuSeparator />
       <MenuItem
-        disabled={isDefaultThreadDetailsVisibility(visibility)}
+        disabled={isDefaultThreadDetailsVisibility(visibility, items)}
         onClick={() => updateClientSettings(RESET_THREAD_DETAILS_ITEMS)}
       >
         Reset to default

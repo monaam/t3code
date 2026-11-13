@@ -67,6 +67,7 @@ import { cn } from "~/lib/utils";
 import { resolveShortcutCommand, type ShortcutMatchContext } from "~/keybindings";
 import { readLocalApi } from "~/localApi";
 import { useStableCallback } from "~/hooks/useStableCallback";
+import { useClientSettings } from "~/hooks/useSettings";
 import { Button } from "~/components/ui/button";
 import { AndroidIcon, AppleIcon } from "~/components/Icons";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
@@ -166,6 +167,23 @@ export interface PullRequestTabStatus {
 }
 
 export type PullRequestTabStatusSeed = Pick<PullRequestTabStatus, "state" | "isDraft">;
+
+const CODE_ONLY_SURFACE_LABELS: ReadonlySet<string> = new Set([
+  "Terminal",
+  "Diff",
+  "Pull request",
+  "Linked pull requests",
+  "Device",
+]);
+
+function withoutCodeSurfaces<Action extends { readonly label: string }>(
+  actions: readonly Action[],
+  ceoModeEnabled: boolean,
+): readonly Action[] {
+  return ceoModeEnabled
+    ? actions.filter((action) => !CODE_ONLY_SURFACE_LABELS.has(action.label))
+    : actions;
+}
 
 function shouldOpenDefaultBrowserProfileFromMenuClick(pointerType: string | undefined): boolean {
   return pointerType !== "touch";
@@ -335,6 +353,7 @@ function RightPanelEmptyState(props: {
   sideChatDisabledReason: string | null;
 }) {
   const [highlight, setHighlight] = useState(-1);
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
 
   const actions = [
     {
@@ -411,7 +430,9 @@ function RightPanelEmptyState(props: {
 
   type SurfaceAction = (typeof actions)[number];
 
-  const availableActions = actions.filter((action) => action.available);
+  const availableActions = withoutCodeSurfaces(actions, ceoModeEnabled).filter(
+    (action) => action.available,
+  );
   const highlightIndex =
     availableActions.length === 0 ? -1 : Math.min(highlight, availableActions.length - 1);
 
@@ -485,7 +506,7 @@ function RightPanelEmptyState(props: {
       <div className="w-full max-w-xs py-6">
         <h3 className="mb-3 text-center font-medium text-foreground text-sm">Open a surface</h3>
         <div className="flex flex-col gap-0.5">
-          {actions.map((action) =>
+          {withoutCodeSurfaces(actions, ceoModeEnabled).map((action) =>
             action.available ? (
               <div
                 key={action.label}
@@ -1035,6 +1056,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   const addSurfaceTriggerRef = useRef<HTMLButtonElement>(null);
   const [renamingDevice, setRenamingDevice] = useState<string | null>(null);
   const [addSurfaceMenuOpen, setAddSurfaceMenuOpen] = useState(false);
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   const [tabScrollState, setTabScrollState] = useState({
     hasOverflow: false,
     canScrollLeft: false,
@@ -1165,8 +1187,10 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       : []),
   ] as const;
 
+  const shownAddSurfaceActions = withoutCodeSurfaces(addSurfaceActions, ceoModeEnabled);
+
   const handleAddSurfaceMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const action = surfaceShortcutActionForKey(addSurfaceActions, event.nativeEvent);
+    const action = surfaceShortcutActionForKey(shownAddSurfaceActions, event.nativeEvent);
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1416,7 +1440,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   sideOffset={6}
                   onKeyDownCapture={handleAddSurfaceMenuKeyDown}
                 >
-                  {addSurfaceActions.map((action) => {
+                  {shownAddSurfaceActions.map((action) => {
                     const Icon = action.icon;
                     if (action.label === "Browser" && action.available) {
                       return (

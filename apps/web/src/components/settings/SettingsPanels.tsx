@@ -467,6 +467,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled
       ? ["Render math"]
       : []),
+    ...(settings.ceoModeEnabled !== DEFAULT_UNIFIED_SETTINGS.ceoModeEnabled ? ["CEO mode"] : []),
     ...(settings.panelAnimationDurationMs !== DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs
       ? ["Panel animations"]
       : []),
@@ -644,6 +645,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       chatWidth: DEFAULT_UNIFIED_SETTINGS.chatWidth,
       effortDisplay: DEFAULT_UNIFIED_SETTINGS.effortDisplay,
       mathRenderingEnabled: DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled,
+      ceoModeEnabled: DEFAULT_UNIFIED_SETTINGS.ceoModeEnabled,
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
       notificationMode: DEFAULT_UNIFIED_SETTINGS.notificationMode,
       inAppNotificationsEnabled: DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled,
@@ -768,6 +770,26 @@ export function GeneralSettingsPanel() {
 
   return (
     <SettingsPageContainer>
+      <SettingsSection id="mode" title="Mode">
+        <SettingsRow
+          {...searchableSetting("ceo-mode")}
+          description="Hide code-only controls: terminal, diffs, branches, worktrees, git actions, and editors. Turning it on also queues follow-ups. Agents can still change code; turn this off to see it."
+          control={
+            <Switch
+              checked={settings.ceoModeEnabled}
+              onCheckedChange={(checked) =>
+                updateSettings(
+                  checked
+                    ? { ceoModeEnabled: true, followUpBehavior: "queue" }
+                    : { ceoModeEnabled: false },
+                )
+              }
+              aria-label="CEO mode"
+            />
+          }
+        />
+      </SettingsSection>
+
       <SettingsSection id="notifications" title="Notifications">
         <NotificationSettings />
         <SettingsRow
@@ -821,7 +843,11 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("project-order")}
-          description="Order of projects in the sidebar project picker and command palette."
+          description={
+            settings.ceoModeEnabled
+              ? "CEO mode lists workspaces pinned first, then by name."
+              : "Order of projects in the sidebar project picker and command palette."
+          }
           resetAction={
             settings.sidebarProjectSortOrder !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder ? (

@@ -805,6 +805,11 @@ describe("sortSidebarV2ProjectGroups", () => {
         (project) => project.projectKey,
       ),
     ).toEqual(["logical-newer", "logical-older"]);
+    expect(
+      sortSidebarV2ProjectGroups(projects, threads, "name", new Set()).map(
+        (project) => project.projectKey,
+      ),
+    ).toEqual(["logical-older", "logical-newer"]);
   });
 });
 

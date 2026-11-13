@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  isDefaultThreadDetailsVisibility,
   resolveThreadDetailsVisibility,
   setThreadDetailsItem,
   THREAD_DETAILS_ITEMS,
+  threadDetailsItemsFor,
 } from "./threadDetailsItems";
 
 const usage = THREAD_DETAILS_ITEMS.find((item) => item.id === "usage")!;
@@ -23,6 +25,18 @@ describe("thread details items", () => {
     expect(visibility.usage).toBe(row.usage);
     expect(visibility.context).toBe(row.context);
     expect(visibility.servers).toBe(true);
+  });
+
+  it("CEO mode hides code-only items even when shown explicitly, and keeps the rest", () => {
+    const visibility = resolveThreadDetailsVisibility({
+      threadDetailsItems: { branch: true },
+      threadDetailsUsageEnabled: false,
+      ceoModeEnabled: true,
+    });
+    expect(visibility.branch).toBe(false);
+    expect(visibility.gitActions).toBe(false);
+    expect(visibility.environment).toBe(true);
+    expect(isDefaultThreadDetailsVisibility(visibility, threadDetailsItemsFor(true))).toBe(true);
   });
 
   it("stores only choices that differ from the default", () => {

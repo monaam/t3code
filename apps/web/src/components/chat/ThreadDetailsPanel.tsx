@@ -88,6 +88,7 @@ interface ThreadDetailsPanelProps extends Pick<
 
 export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
   const visible = useClientSettings(resolveThreadDetailsVisibility);
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const fileScripts = useT3ProjectFileScripts(
     props.environmentId,
@@ -95,7 +96,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
   );
   const activeThreadRef = { environmentId: props.environmentId, threadId: props.threadId };
   const branchToolbarProps = {
-    showGitControls: props.isGitRepo,
+    showGitControls: props.isGitRepo && !ceoModeEnabled,
     environmentId: props.environmentId,
     threadId: props.threadId,
     projectId: props.projectId,

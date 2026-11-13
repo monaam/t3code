@@ -11,7 +11,11 @@ import { useProjects, useVisibleThreadShells } from "../state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "../state/environments";
 import { buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
-import { orderItemsByPreferredIds, sortLogicalProjectsForSidebar } from "./Sidebar.logic";
+import {
+  orderItemsByPreferredIds,
+  projectListOrder,
+  sortLogicalProjectsForSidebar,
+} from "./Sidebar.logic";
 
 // Each helper reads its own source hook so the compiler caches the derived value on that
 // source. Taking the source as an argument instead leaves the helper hook-free, and the
@@ -51,6 +55,7 @@ export const selectCommandPaletteClientSettings = (settings: ClientSettings) => 
   sidebarProjectGroupingOverrides: settings.sidebarProjectGroupingOverrides,
   sidebarProjectSortOrder: settings.sidebarProjectSortOrder,
   sidebarThreadSortOrder: settings.sidebarThreadSortOrder,
+  ceoModeEnabled: settings.ceoModeEnabled,
 });
 
 export function useSortedProjectGroups(environmentLabelById: ReadonlyMap<EnvironmentId, string>) {
@@ -81,6 +86,6 @@ export function useSortedProjectGroups(environmentLabelById: ReadonlyMap<Environ
   return sortLogicalProjectsForSidebar(
     unsortedProjectGroups,
     threads,
-    clientSettings.sidebarProjectSortOrder,
+    projectListOrder(clientSettings.sidebarProjectSortOrder, clientSettings.ceoModeEnabled),
   );
 }

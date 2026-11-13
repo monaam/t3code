@@ -78,6 +78,7 @@ import {
   SquarePenIcon,
   TextSearchIcon,
   UserPlusIcon,
+  SendIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
 import {
@@ -109,6 +110,8 @@ import {
 } from "./promptLinks/copyPromptLink";
 import { useClientSettings } from "../hooks/useSettings";
 import { type WorkspaceTerms, workspaceTermsFor } from "../workspaceTerms";
+import { parseQuickAsk } from "./quickAsk.logic";
+import { useQuickAsk } from "./useQuickAsk";
 import { useStableCallback } from "../hooks/useStableCallback";
 import { readLocalApi } from "../localApi";
 import { configuredHostedAppUrl } from "../hostedPairing";
@@ -524,6 +527,7 @@ function OpenCommandPaletteDialog(props: {
   );
   const [isPickingProjectFolder, setIsPickingProjectFolder] = useState(false);
   const [searchAllProjects, setSearchAllProjects] = useState(false);
+  const quickAsk = useQuickAsk();
   const [addProjectCloneFlow, setAddProjectCloneFlow] = useState<AddProjectCloneFlow | null>(null);
   const [newProjectFlow, setNewProjectFlow] = useState<{
     readonly environmentId: EnvironmentId;
@@ -2426,7 +2430,62 @@ function OpenCommandPaletteDialog(props: {
           },
         ];
 
-  let displayedGroups: CommandPaletteView["groups"] = filteredGroups;
+  // CEO mode: "Pronto: brief" asks that workspace; a plain query offers the open one last.
+  const quickAskBrief = deferredQuery.trim();
+  const quickAskOn =
+    clientSettings.ceoModeEnabled &&
+    currentView === null &&
+    quickAskBrief.length > 0 &&
+    !quickAskBrief.startsWith(">");
+  const quickAskTargets = projectGroups.filter(
+    (group) =>
+      !group.archived &&
+      group.memberProjectRefs.some((ref) => ref.environmentId === primaryEnvironmentId),
+  );
+  const quickAskParsed = quickAskOn ? parseQuickAsk(quickAskBrief, quickAskTargets) : null;
+  const quickAskItem = (group: (typeof quickAskTargets)[number], brief: string) => {
+    const ref = group.memberProjectRefs.find(
+      (candidate) => candidate.environmentId === primaryEnvironmentId,
+    );
+    return {
+      kind: "action" as const,
+      value: `quick-ask:${group.projectKey}`,
+      searchTerms: [],
+      title: `Ask ${group.displayName}`,
+      description: brief,
+      icon: <SendIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        if (ref)
+          await quickAsk({ projectId: ref.projectId, workspaceName: group.displayName, brief });
+      },
+    };
+  };
+  const quickAskCurrent =
+    quickAskOn && quickAskParsed === null && searchProjectGroup !== null
+      ? (quickAskTargets.find((group) => group.projectKey === searchProjectGroup.projectKey) ??
+        null)
+      : null;
+  let displayedGroups: CommandPaletteView["groups"] = [
+    ...(quickAskParsed
+      ? [
+          {
+            value: "quick-ask",
+            label: "Ask",
+            items: [quickAskItem(quickAskParsed.target, quickAskParsed.brief)],
+          },
+        ]
+      : []),
+    ...filteredGroups,
+    ...(quickAskCurrent
+      ? [
+          {
+            value: "quick-ask",
+            label: "Ask",
+            items: [quickAskItem(quickAskCurrent, quickAskBrief)],
+          },
+        ]
+      : []),
+  ];
   if (newProjectFlow !== null) {
     displayedGroups = [
       ...(newProjectMachineGroup ? [newProjectMachineGroup] : []),

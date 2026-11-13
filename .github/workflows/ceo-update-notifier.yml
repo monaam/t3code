@@ -1,0 +1,52 @@
+name: CEO fork update notifier
+
+# Pings Discord once when upstream publishes a stable release that
+# feat/ceo-mode does not contain yet. The update itself is scripts/ceo-update.sh.
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    if: github.repository == 'monaam/t3code'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find the newest upstream release
+        id: release
+        run: |
+          upstream=https://github.com/pingdotgg/t3code.git
+          tag="$(git ls-remote --tags --refs "$upstream" 'v*' | awk '{print $2}' |
+            sed -nE 's#^refs/tags/(v[0-9]+\.[0-9]+\.[0-9]+)$#\1#p' | sort -V | tail -1)"
+          [ -n "$tag" ] || { echo "No stable tag found upstream."; exit 1; }
+          git init -q repo && cd repo
+          git fetch -q --filter=tree:0 "$upstream" "refs/tags/$tag:refs/tags/$tag"
+          git fetch -q --filter=tree:0 "https://github.com/${GITHUB_REPOSITORY}.git" feat/ceo-mode
+          if git merge-base --is-ancestor "$tag" FETCH_HEAD; then behind=false; else behind=true; fi
+          echo "$tag: behind=$behind"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "behind=$behind" >> "$GITHUB_OUTPUT"
+
+      # A cache entry per tag is the "already notified" record.
+      - name: Check whether this release was already announced
+        if: steps.release.outputs.behind == 'true'
+        id: announced
+        uses: actions/cache@v6
+        with:
+          path: announced
+          key: ceo-update-announced-${{ steps.release.outputs.tag }}
+
+      - name: Ping Discord
+        if: steps.release.outputs.behind == 'true' && steps.announced.outputs.cache-hit != 'true'
+        env:
+          WEBHOOK: ${{ secrets.CEO_UPDATE_DISCORD_WEBHOOK }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          [ -n "$WEBHOOK" ] || { echo "Secret CEO_UPDATE_DISCORD_WEBHOOK is not set."; exit 1; }
+          mkdir -p announced && echo "$TAG" > announced/tag
+          body="$(jq -n --arg tag "$TAG" '{content: ("T3 Code \($tag) is out and T3 Code CEO does not have it yet. To update, run `scripts/ceo-update.sh` in the t3code checkout.\nhttps://github.com/pingdotgg/t3code/releases/tag/\($tag)")}')"
+          curl -fsS -H "Content-Type: application/json" -d "$body" "$WEBHOOK"

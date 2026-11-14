@@ -48,5 +48,5 @@ jobs:
         run: |
           [ -n "$WEBHOOK" ] || { echo "Secret CEO_UPDATE_DISCORD_WEBHOOK is not set."; exit 1; }
           mkdir -p announced && echo "$TAG" > announced/tag
-          body="$(jq -n --arg tag "$TAG" '{content: ("T3 Code \($tag) is out and T3 Code CEO does not have it yet. To update, run `scripts/ceo-update.sh` in the t3code checkout.\nhttps://github.com/pingdotgg/t3code/releases/tag/\($tag)")}')"
+          body="$(jq -n --arg tag "$TAG" '{content: ("T3 Code \($tag) is out and T3 CEO does not have it yet. To update, run `scripts/ceo-update.sh` in the t3code checkout.\nhttps://github.com/pingdotgg/t3code/releases/tag/\($tag)")}')"
           curl -fsS -H "Content-Type: application/json" -d "$body" "$WEBHOOK"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Updates the "T3 Code CEO" fork build to the newest upstream T3 Code release:
+# Updates the "T3 CEO" fork build to the newest upstream T3 Code release:
 # merge the release tag into feat/ceo-mode, check, build the dmg, install it.
 # Re-run after any stop; it resumes where it left off.
 #
@@ -16,7 +16,9 @@ set -euo pipefail
 BRANCH="feat/ceo-mode"
 UPSTREAM="upstream"
 NODE_VERSION="26.12.1"
-APP="/Applications/T3 Code CEO.app"
+APP="/Applications/T3 CEO.app"
+# The fork was installed under this name before the T3 CEO rename.
+LEGACY_APP="/Applications/T3 Code CEO.app"
 FALLBACK_APP="/Applications/T3 Code (Beta).app"
 LIVE_DB="$HOME/.t3/userdata/statev2.sqlite"
 LIVE_SETTINGS="$HOME/.t3/userdata/client-settings.json"
@@ -207,7 +209,7 @@ step "Building the desktop app (this takes a while)"
 BUILD_STAMP="$(mktemp)"
 T3CODE_DESKTOP_VERSION="${TAG#v}" vp run dist:desktop:dmg:arm64 ||
   stop "The build failed. If browser tests could not start: vp exec playwright install chromium-headless-shell"
-DMG="$(find "$ROOT/release" -maxdepth 1 -name 'T3-Code-*-arm64.dmg' -newer "$BUILD_STAMP" | head -1)"
+DMG="$(find "$ROOT/release" -maxdepth 1 -name 'T3-*-arm64.dmg' -newer "$BUILD_STAMP" | head -1)"
 rm -f "$BUILD_STAMP"
 [ -n "$DMG" ] || stop "The build finished but wrote no new dmg in release/."
 echo "Built: $DMG"
@@ -217,6 +219,8 @@ echo "Built: $DMG"
 step "Installing over $APP"
 [ -z "$(app_pids "$FALLBACK_APP")" ] ||
   stop "The official T3 Code (Beta) app is running. Quit it, then re-run with --force. The build is at $DMG"
+[ -z "$(app_pids "$LEGACY_APP")" ] ||
+  stop "T3 Code CEO (the old name) is running. Quit it, then re-run with --force. The build is at $DMG"
 
 MOUNT="$(mktemp -d)"
 detach() { hdiutil detach -quiet "$MOUNT" 2>/dev/null || true; rmdir "$MOUNT" 2>/dev/null || true; }
@@ -238,12 +242,12 @@ if [ -n "$(app_pids "$APP")" ]; then
       echo "No thread was active in the last 5 minutes."
     fi
   fi
-  confirm "$PRE_QUIT" --quit-app "Quit T3 Code CEO now and install $TAG?" ||
+  confirm "$PRE_QUIT" --quit-app "Quit T3 CEO now and install $TAG?" ||
     stop "Not installed. Re-run with --force when ready. The build is at $DMG"
-  osascript -e 'tell application "T3 Code CEO" to quit' || true
+  osascript -e 'tell application "T3 CEO" to quit' || true
   WAITED=0
   while [ -n "$(app_pids "$APP")" ]; do
-    [ "$WAITED" -lt 60 ] || stop "T3 Code CEO did not quit within 60 seconds. Quit it by hand, then re-run with --force."
+    [ "$WAITED" -lt 60 ] || stop "T3 CEO did not quit within 60 seconds. Quit it by hand, then re-run with --force."
     sleep 1
     WAITED=$((WAITED + 1))
   done
@@ -258,6 +262,11 @@ if [ -d "$APP" ]; then
   mv "$APP" "$PREVIOUS/" || stop "Could not move the old app aside. The new one is at $APP.new"
 fi
 mv "$APP.new" "$APP"
+if [ -d "$LEGACY_APP" ]; then
+  mkdir -p "$PREVIOUS"
+  rm -rf "$PREVIOUS/$(basename "$LEGACY_APP")"
+  mv "$LEGACY_APP" "$PREVIOUS/" || echo "Could not move $LEGACY_APP aside. Delete it by hand."
+fi
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 git rev-parse HEAD >"$INSTALLED_FILE"
 detach
@@ -277,5 +286,5 @@ if [ -f "$LIVE_SETTINGS" ] && ! $GREP -Eq '"ceoModeEnabled":[[:space:]]*true' "$
   echo "WARNING: ceoModeEnabled is not true in $LIVE_SETTINGS. Turn CEO mode back on in Settings."
 fi
 echo
-echo "Done. T3 Code CEO is running $TAG ($(git rev-parse --short HEAD))."
+echo "Done. T3 CEO is running $TAG ($(git rev-parse --short HEAD))."
 echo "The previous app is kept at $PREVIOUS"

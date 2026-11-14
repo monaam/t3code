@@ -169,9 +169,10 @@ function HistoryNavigationButton({
 }
 
 function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
+  const suffix = useBrandSuffix();
   return (
     <Link
-      aria-label="T3 Code home"
+      aria-label={`T3 ${suffix} home`}
       className={cn(
         "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
         onBackdrop ? "text-white" : "text-foreground",
@@ -183,7 +184,12 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   );
 }
 
+function useBrandSuffix() {
+  return useClientSettings((settings) => settings.ceoModeEnabled) ? "CEO" : "Code";
+}
+
 function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
+  const suffix = useBrandSuffix();
   return (
     <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
       <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
@@ -193,7 +199,7 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
           onBackdrop ? "text-white/70" : "text-muted-foreground",
         )}
       >
-        Code
+        {suffix}
       </span>
     </span>
   );

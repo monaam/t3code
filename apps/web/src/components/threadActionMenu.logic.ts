@@ -21,6 +21,8 @@ export type ThreadActionMenuId =
   | "rename"
   | "regenerate-title"
   | "mark-unread"
+  | "nest-under"
+  | "un-nest"
   | "share-guest"
   | "copy"
   | "copy-path"
@@ -96,6 +98,9 @@ export interface ThreadActionMenuState {
   readonly snoozePresets: ReadonlyArray<SnoozePreset>;
   /** Guest links need their own grant, so the caller checks it instead of `canOperate`. */
   readonly canShareWithGuest?: boolean;
+  /** The thread this one can move under, such as today's daily. */
+  readonly nestUnder?: { readonly label: string } | null;
+  readonly isNested?: boolean;
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
   readonly terms?: WorkspaceTerms;
@@ -184,6 +189,18 @@ export function buildThreadActionMenuItems(
         ]
       : []),
     { id: "mark-unread", label: "Mark unread", icon: "mail-open" },
+    ...(state.nestUnder
+      ? [
+          {
+            id: "nest-under" as const,
+            label: `Move under ${state.nestUnder.label}`,
+            icon: "corner-down-right",
+          },
+        ]
+      : []),
+    ...(state.isNested
+      ? [{ id: "un-nest" as const, label: "Un-nest thread", icon: "corner-left-up" }]
+      : []),
     ...(state.canShareWithGuest
       ? [{ id: "share-guest" as const, label: "Share with guest", icon: "user-plus" }]
       : []),

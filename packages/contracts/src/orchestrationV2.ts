@@ -460,7 +460,7 @@ export const OrchestrationV2AppThread = Schema.Struct({
   historyOrigin: Schema.optional(OrchestrationV2ThreadHistoryOrigin),
   linkOrigin: Schema.optional(OrchestrationV2LinkOrigin),
   delegatedFrom: Schema.optional(OrchestrationV2DelegatedFrom),
-  /** The thread whose agent launched this one with `t3_thread_launch`, in the same environment. */
+  /** The thread this one nests under in the same environment: its launcher, or one it moved under. */
   launchedByThreadId: Schema.optional(ThreadId),
   lineage: OrchestrationV2AppThreadLineage,
   forkedFrom: Schema.NullOr(
@@ -3102,6 +3102,8 @@ export const OrchestrationV2Command = Schema.Union([
     limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecoveryUpdate)),
     /** Link (object) or unlink (null) a pull request; absent leaves it unchanged. */
     linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+    /** Nest under another thread (id) or detach (null); absent leaves it unchanged. */
+    launchedByThreadId: Schema.optional(Schema.NullOr(ThreadId)),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.pull-request.link"),

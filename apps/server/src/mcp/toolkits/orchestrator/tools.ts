@@ -253,7 +253,7 @@ const ThreadReadTool = Tool.make("t3_thread_read", {
 
 const ThreadUpdateTool = Tool.make("t3_thread_update", {
   description:
-    "Rename a thread (`action:'rename'` with `title`) or regenerate its title. Omit `threadId` for this thread. Workspace and branch cannot change here.",
+    "Rename a thread (`action:'rename'` with `title`) or regenerate its title. `set_parent` nests a thread under `parentThreadId` (default: this thread); `clear_parent` un-nests it. Omit `threadId` for this thread. Workspace and branch cannot change here.",
   // Keeps the input's action/field check, which rebuilding the struct would drop.
   parameters: ThreadMetadataMcpUpdateInput.mapFields(
     Struct.assign({ environmentId: OrchestratorMcpEnvironmentTarget }),

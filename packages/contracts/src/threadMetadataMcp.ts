@@ -40,19 +40,29 @@ const ThreadMetadataClientRequestId = TrimmedNonEmptyString.check(Schema.isMaxLe
   )
   .annotate({ description: "Stable idempotency key to reuse when retrying this mutation." });
 
-export const ThreadMetadataMcpAction = Schema.Literals(["rename", "regenerate_title"]);
+export const ThreadMetadataMcpAction = Schema.Literals([
+  "rename",
+  "regenerate_title",
+  "set_parent",
+  "clear_parent",
+]);
 export type ThreadMetadataMcpAction = typeof ThreadMetadataMcpAction.Type;
 
 export const ThreadMetadataMcpUpdateInput = Schema.Struct({
   threadId: Schema.optional(ThreadId),
   action: ThreadMetadataMcpAction,
   title: Schema.optional(ThreadMetadataTitle),
+  parentThreadId: Schema.optional(ThreadId).annotate({
+    description: "Thread to nest under, for set_parent. Defaults to this thread.",
+  }),
   clientRequestId: Schema.optional(ThreadMetadataClientRequestId),
 }).check(
   Schema.makeFilter((input) =>
-    (input.action === "rename") === (input.title !== undefined)
-      ? true
-      : "rename requires title; regenerate_title does not accept one.",
+    (input.action === "rename") !== (input.title !== undefined)
+      ? "rename requires title; other actions do not accept one."
+      : input.action !== "set_parent" && input.parentThreadId !== undefined
+        ? "parentThreadId is only accepted by set_parent."
+        : true,
   ),
 );
 export type ThreadMetadataMcpUpdateInput = typeof ThreadMetadataMcpUpdateInput.Type;
@@ -65,6 +75,7 @@ export const ThreadMetadataMcpUpdateResult = Schema.Struct({
   title: Schema.String,
   titleRegeneration: Schema.NullOr(ThreadTitleRegeneration),
   linkedPullRequest: Schema.NullOr(ThreadLinkedPullRequest),
+  parentThreadId: Schema.NullOr(ThreadId),
   updatedAt: IsoDateTime,
 });
 export type ThreadMetadataMcpUpdateResult = typeof ThreadMetadataMcpUpdateResult.Type;

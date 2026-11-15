@@ -3641,6 +3641,31 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           cause: `Thread ${command.threadId} is no longer empty.`,
         });
     }
+    if (command.type === "thread.metadata.update" && command.launchedByThreadId != null) {
+      const reject = (cause: string) =>
+        new OrchestratorDispatchError({
+          commandId: command.commandId,
+          commandType: command.type,
+          cause: `Thread ${command.threadId} ${cause}`,
+        });
+      // Walk up from the new parent; meeting this thread would make a cycle.
+      const seen = new Set<ThreadId>();
+      let ancestorId: ThreadId | undefined = command.launchedByThreadId;
+      while (ancestorId !== undefined && !seen.has(ancestorId)) {
+        if (ancestorId === command.threadId) {
+          return yield* reject("cannot be nested under itself or a thread nested under it.");
+        }
+        seen.add(ancestorId);
+        const ancestor: OrchestrationV2ThreadShell | null = yield* projectionStore
+          .getThreadShell(ancestorId)
+          .pipe(mapDispatchError(command));
+        if (ancestor === null || ancestor.deletedAt !== null) {
+          if (ancestorId !== command.launchedByThreadId) break;
+          return yield* reject(`cannot be nested under missing thread ${ancestorId}.`);
+        }
+        ancestorId = ancestor.launchedByThreadId;
+      }
+    }
     if (command.type === "thread.archive" && thread.archivedAt !== null) {
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,
@@ -4128,7 +4153,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                     snooze: command.limitRecovery.snooze ?? previousRecovery?.snooze ?? false,
                     requestId: command.commandId,
                   };
-          return {
+          const updated = {
             ...thread,
             ...(command.title === undefined ? {} : { title: command.title }),
             ...(command.limitRecovery === undefined ? {} : { limitRecovery }),
@@ -4149,6 +4174,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 : {}),
             ...(command.branch === undefined ? {} : { branch: command.branch }),
             ...(command.worktreePath === undefined ? {} : { worktreePath: command.worktreePath }),
+            ...(command.launchedByThreadId == null
+              ? {}
+              : { launchedByThreadId: command.launchedByThreadId }),
             ...(command.linkedPullRequest === undefined
               ? {}
               : {
@@ -4183,6 +4211,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 : {}),
             updatedAt: now,
           };
+          if (command.launchedByThreadId !== null) return updated;
+          const { launchedByThreadId: _detached, ...detached } = updated;
+          return detached;
         }
         case "thread.pull-request.link":
         case "thread.pull-request.unlink":

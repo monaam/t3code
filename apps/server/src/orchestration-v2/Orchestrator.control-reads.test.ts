@@ -1574,6 +1574,60 @@ it.effect("wakes the parent once when its delegated task asks a question", () =>
   }).pipe(Effect.provide(DelegatedTaskQuestionReactor.layer.pipe(Layer.provideMerge(layerTest)))),
 );
 
+it.effect("moves a thread under another parent, refusing cycles, and detaches it", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const yesterday = ThreadId.make("thread:parent-yesterday");
+    const today = ThreadId.make("thread:parent-today");
+    const side = ThreadId.make("thread:parent-side");
+    for (const threadId of [yesterday, today, side]) {
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make(`create-${threadId}`),
+        threadId,
+        projectId: ProjectId.make("project:parent"),
+        title: threadId,
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        createdBy: "user",
+        creationSource: "web",
+        ...(threadId === side ? { launchedByThreadId: yesterday } : {}),
+      });
+    }
+    const setParent = (threadId: ThreadId, launchedByThreadId: ThreadId | null, id: string) =>
+      orchestrator.dispatch({
+        type: "thread.metadata.update",
+        commandId: CommandId.make(id),
+        threadId,
+        launchedByThreadId,
+      });
+    const parentOf = (threadId: ThreadId) =>
+      projections.getThreadShell(threadId).pipe(Effect.map((shell) => shell?.launchedByThreadId));
+
+    yield* setParent(side, today, "move-side");
+    assert.equal(yield* parentOf(side), today);
+
+    yield* setParent(yesterday, side, "nest-yesterday");
+    for (const [threadId, parent, id] of [
+      [side, side, "self"],
+      [today, side, "cycle"],
+      [today, yesterday, "deep-cycle"],
+      [side, ThreadId.make("thread:missing"), "missing"],
+    ] as const) {
+      const exit = yield* Effect.exit(setParent(threadId, parent, id));
+      assert.equal(exit._tag, "Failure", id);
+    }
+
+    yield* setParent(side, null, "detach-side");
+    assert.equal(yield* parentOf(side), undefined);
+    assert.equal((yield* projections.getThread(side)).launchedByThreadId, undefined);
+  }).pipe(Effect.provide(layerTest)),
+);
+
 it.effect.each([false, true])("rejects thread.create for an existing id (deleted: %s)", (deleted) =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;

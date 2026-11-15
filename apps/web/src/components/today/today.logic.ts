@@ -77,3 +77,26 @@ export function dailyThreadTitle(dayKey: string): string {
   const [year, month, date] = dayKey.split("-");
   return `${date}/${month}/${year}`;
 }
+
+type NestableThread = Pick<
+  SidebarThreadSummary,
+  "id" | "environmentId" | "title" | "archivedAt" | "launchedByThreadId"
+>;
+
+/** Today's /daily in the thread's environment, when the thread could move under it. */
+export function dailyNestTarget<T extends NestableThread>(
+  thread: T,
+  threads: ReadonlyArray<T>,
+  dayKey: string,
+): T | null {
+  const title = dailyThreadTitle(dayKey);
+  const daily = threads.find(
+    (candidate) =>
+      candidate.environmentId === thread.environmentId &&
+      candidate.archivedAt === null &&
+      candidate.title === title,
+  );
+  return daily === undefined || daily.id === thread.id || daily.id === thread.launchedByThreadId
+    ? null
+    : daily;
+}

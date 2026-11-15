@@ -61,6 +61,10 @@ vi.mock("../state/entities", () => ({
   }),
   useProjects: () => [{ id: "project", environmentId: "secondary" }],
 }));
+vi.mock("../components/today/today.logic", () => ({
+  dailyNestTarget: () => null,
+  localDayKey: () => "2026-11-14",
+}));
 vi.mock("../state/environments", () => ({ usePrimaryEnvironmentId: () => "primary" }));
 vi.mock("../state/threads", () => ({ threadEnvironment: { updateMetadata: "metadata" } }));
 vi.mock("../state/use-atom-command", () => ({

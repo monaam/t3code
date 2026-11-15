@@ -146,11 +146,17 @@ export function TodayPage() {
   const dayKey = localDayKey(now, offset);
   const [filter, setFilter] = useState<TodayBucket | null>(null);
   const projects = useProjects();
-  const threads = useVisibleThreadShells().filter(
+  const listed = useVisibleThreadShells().filter(
+    (thread) => thread.archivedAt === null && isListedThreadLineage(thread.lineage),
+  );
+  const daily = listed.find((thread) => thread.title === dailyThreadTitle(dayKey)) ?? null;
+  // Threads moved under the day's daily belong to that day even when idle.
+  const threads = listed.filter(
     (thread) =>
-      thread.archivedAt === null &&
-      isListedThreadLineage(thread.lineage) &&
-      threadActiveOn(thread, dayKey),
+      threadActiveOn(thread, dayKey) ||
+      (daily !== null &&
+        thread.environmentId === daily.environmentId &&
+        thread.launchedByThreadId === daily.id),
   );
 
   const projectByKey = new Map<string, (typeof projects)[number]>(
@@ -159,7 +165,6 @@ export function TodayPage() {
   const workspaceNameOf = (thread: Thread) =>
     projectByKey.get(`${thread.environmentId}:${thread.projectId}`)?.title ?? "Other";
 
-  const daily = threads.find((thread) => thread.title === dailyThreadTitle(dayKey)) ?? null;
   const launchedBy = (thread: Thread) =>
     thread.launchedByThreadId === null
       ? null

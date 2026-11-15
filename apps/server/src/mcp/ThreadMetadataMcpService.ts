@@ -62,6 +62,7 @@ function commandId(input: {
 function metadataCommand(input: {
   readonly commandId: CommandId;
   readonly threadId: ThreadId;
+  readonly parentThreadId: ThreadId | undefined;
   readonly update: ThreadMetadataMcpUpdateInput;
 }): Extract<OrchestrationV2Command, { readonly type: "thread.metadata.update" }> {
   switch (input.update.action) {
@@ -79,6 +80,20 @@ function metadataCommand(input: {
         threadId: input.threadId,
         regenerateTitle: true,
       };
+    case "set_parent":
+      return {
+        type: "thread.metadata.update",
+        commandId: input.commandId,
+        threadId: input.threadId,
+        launchedByThreadId: input.parentThreadId!,
+      };
+    case "clear_parent":
+      return {
+        type: "thread.metadata.update",
+        commandId: input.commandId,
+        threadId: input.threadId,
+        launchedByThreadId: null,
+      };
   }
 }
 
@@ -88,7 +103,7 @@ function resultFromThread(input: {
   readonly sequence: number;
   readonly thread: Pick<
     OrchestrationV2AppThread,
-    "id" | "title" | "titleRegeneration" | "linkedPullRequest" | "updatedAt"
+    "id" | "title" | "titleRegeneration" | "linkedPullRequest" | "launchedByThreadId" | "updatedAt"
   >;
 }): ThreadMetadataMcpUpdateResult {
   return {
@@ -105,6 +120,7 @@ function resultFromThread(input: {
             startedAt: DateTime.formatIso(input.thread.titleRegeneration.startedAt),
           },
     linkedPullRequest: input.thread.linkedPullRequest ?? null,
+    parentThreadId: input.thread.launchedByThreadId ?? null,
     updatedAt: DateTime.formatIso(input.thread.updatedAt),
   };
 }
@@ -144,6 +160,14 @@ const make = Effect.gen(function* () {
     if (shell === null || shell.deletedAt !== null) {
       return yield* threadNotFound(threadManagement, threadId, `Thread ${threadId} was not found.`);
     }
+    const parentThreadId =
+      input.action === "set_parent" ? (input.parentThreadId ?? scope.thread?.threadId) : undefined;
+    if (input.action === "set_parent" && parentThreadId === undefined) {
+      return yield* failure(
+        "target_required",
+        "Pass parentThreadId: this MCP client is not running inside a T3 thread.",
+      );
+    }
     const requestKey =
       input.clientRequestId === undefined ? yield* random.uuidV4() : input.clientRequestId;
     const updateCommandId = commandId({
@@ -157,6 +181,7 @@ const make = Effect.gen(function* () {
         metadataCommand({
           commandId: updateCommandId,
           threadId,
+          parentThreadId,
           update: input,
         }),
       )

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  dailyNestTarget,
   dailyThreadTitle,
   dayOffsetOf,
   localDayKey,
@@ -45,6 +46,33 @@ describe("today", () => {
     expect(threadActiveOn(ranToday, "2026-11-13")).toBe(true);
     expect(threadActiveOn(ranToday, "2026-11-11")).toBe(false);
     expect(threadActiveOn(idle, "2026-11-10")).toBe(true);
+  });
+
+  it("offers today's daily as a parent only to other threads not already under it", () => {
+    const thread = (id: string, title: string, extra: object = {}) =>
+      ({
+        id,
+        environmentId: "env",
+        title,
+        archivedAt: null,
+        launchedByThreadId: null,
+        ...extra,
+      }) as never as Parameters<typeof dailyNestTarget>[0];
+    const today = thread("today", "14/11/2026");
+    const threads = [
+      thread("yesterday", "13/11/2026"),
+      today,
+      thread("archived", "14/11/2026", { archivedAt: "2026-11-14T08:00:00" }),
+    ];
+    const leftover = thread("side", "Invoice", { launchedByThreadId: "yesterday" });
+    expect(dailyNestTarget(leftover, threads, "2026-11-14")).toBe(today);
+    expect(dailyNestTarget(today, threads, "2026-11-14")).toBeNull();
+    expect(
+      dailyNestTarget({ ...leftover, launchedByThreadId: today.id }, threads, "2026-11-14"),
+    ).toBeNull();
+    expect(
+      dailyNestTarget(thread("side", "Invoice", { environmentId: "other" }), threads, "2026-11-14"),
+    ).toBeNull();
   });
 
   it("sorts a thread into waiting, failed, running or done", () => {

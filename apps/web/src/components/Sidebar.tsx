@@ -141,12 +141,14 @@ import {
 } from "../state/environments";
 import {
   readThreadShell,
+  readVisibleThreadShells,
   useAllEnvironmentProjectSnapshotsReady,
   useDelegatedUnderParent,
   useProjects,
   useServerConfigs,
   useQuietThreadShells,
 } from "../state/entities";
+import { dailyNestTarget, localDayKey } from "./today/today.logic";
 import { environmentPresentations } from "../state/presentation";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { environmentProjects } from "../state/projects";
@@ -2683,6 +2685,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 projectRef.projectId === thread.projectId,
             ),
           ) ?? null;
+        // Nesting only shows in CEO mode, where the list groups threads under their parent.
+        const daily = ceoModeEnabled
+          ? dailyNestTarget(thread, readVisibleThreadShells(), localDayKey(new Date()))
+          : null;
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             buildThreadActionMenuItems({
@@ -2711,6 +2717,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 canShareWithGuestAtom(threadRef.environmentId),
               ),
               canTurnIntoProject: canTurnThreadIntoProject(threadRef),
+              nestUnder: daily ? { label: "today's daily" } : null,
+              isNested: ceoModeEnabled && thread.launchedByThreadId !== null,
               supports: {
                 settlement: configLoaded,
                 autoSettleOptOut: supportsAutoSettleOptOut,
@@ -2856,6 +2864,26 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           case "mark-unread":
             markThreadUnread(threadRef);
             return;
+          case "nest-under":
+          case "un-nest": {
+            const launchedByThreadId = clicked.value === "nest-under" ? daily?.id : null;
+            if (launchedByThreadId === undefined) return;
+            const result = await updateThreadMetadata({
+              environmentId: threadRef.environmentId,
+              input: { threadId: threadRef.threadId, launchedByThreadId },
+            });
+            if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+              const error = squashAtomCommandFailure(result);
+              toastManager.add(
+                stackedThreadToast({
+                  type: "error",
+                  title: "Failed to move thread",
+                  description: error instanceof Error ? error.message : "An error occurred.",
+                }),
+              );
+            }
+            return;
+          }
           case "copy-path":
             if (!threadWorkspacePath) {
               toastManager.add(

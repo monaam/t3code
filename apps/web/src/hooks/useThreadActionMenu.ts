@@ -32,8 +32,10 @@ import {
   readEnvironmentServerConfigLoaded,
   readEnvironmentSupportsAutoSettleOptOut,
   readThreadShell,
+  readVisibleThreadShells,
   useProjects,
 } from "../state/entities";
+import { dailyNestTarget, localDayKey } from "../components/today/today.logic";
 import { usePrimaryEnvironmentId } from "../state/environments";
 import { readLocalApi } from "../localApi";
 import { configuredHostedAppUrl } from "../hostedPairing";
@@ -97,6 +99,7 @@ export function useThreadActionMenu(input: {
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
   const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
   const timestampFormat = useClientSettings((s) => s.timestampFormat);
+  const ceoModeEnabled = useClientSettings((s) => s.ceoModeEnabled);
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
     onCopy: ({ path }) => {
       toastManager.add({ type: "success", title: "Path copied", description: path });
@@ -138,6 +141,10 @@ export function useThreadActionMenu(input: {
       };
       const isRegeneratingTitle = thread.titleRegeneration != null;
       const snoozePresets = resolveSnoozePresets(now, timestampFormat, threadRef.environmentId);
+      // Nesting only shows in CEO mode, where lists group threads under their parent.
+      const daily = ceoModeEnabled
+        ? dailyNestTarget(thread, readVisibleThreadShells(), localDayKey(now))
+        : null;
       const items = buildThreadActionMenuItems({
         terms,
         canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
@@ -155,6 +162,8 @@ export function useThreadActionMenu(input: {
         snoozePresets,
         canShareWithGuest,
         canTurnIntoProject: canTurnThreadIntoProject(threadRef),
+        nestUnder: daily ? { label: "today's daily" } : null,
+        isNested: ceoModeEnabled && thread.launchedByThreadId !== null,
       });
       const clicked = await settlePromise(() => api.contextMenu.show(items, position));
       if (clicked._tag === "Failure" || clicked.value === null) return;
@@ -265,6 +274,18 @@ export function useThreadActionMenu(input: {
         case "mark-unread":
           markThreadUnread(threadRef);
           return;
+        case "nest-under":
+        case "un-nest": {
+          const launchedByThreadId = action === "nest-under" ? daily?.id : null;
+          if (launchedByThreadId === undefined) return;
+          await reportFailure("Failed to move thread", () =>
+            updateThreadMetadata({
+              environmentId: threadRef.environmentId,
+              input: { threadId: threadRef.threadId, launchedByThreadId },
+            }),
+          );
+          return;
+        }
         case "share-guest":
           openGuestShareDialog(threadRef);
           return;

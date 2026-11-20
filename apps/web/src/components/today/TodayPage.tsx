@@ -1,6 +1,7 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { isListedThreadLineage } from "@t3tools/contracts";
 import { useNavigate, useSearch } from "@tanstack/react-router";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -30,10 +31,17 @@ import {
 const MAX_DAYS_BACK = 7;
 
 const BUCKET_LABEL: Record<TodayBucket, string> = {
-  waiting: "Waiting on you",
-  failed: "Failed",
-  running: "Running",
-  done: "Done",
+  waiting: msg("Waiting on you"),
+  failed: msg("Failed", { $context: "thread status" }),
+  running: msg("Running", { $context: "thread status" }),
+  done: msg("Done", { $context: "thread status" }),
+};
+
+const BUCKET_COUNT: Record<TodayBucket, string> = {
+  waiting: msg("{count} waiting on you"),
+  failed: msg("{count} failed", { $context: "threads by status" }),
+  running: msg("{count} running", { $context: "threads by status" }),
+  done: msg("{count} done", { $context: "threads by status" }),
 };
 
 const BUCKET_DOT: Record<TodayBucket, string> = {
@@ -77,7 +85,7 @@ function ReplyPreview({ thread }: { thread: Thread }) {
   const reply = useLastReply(thread);
   return (
     <span className="line-clamp-6 whitespace-pre-wrap">
-      {reply === null ? "No reply yet." : reply.trim().slice(0, 600)}
+      {reply === null ? <T>No reply yet.</T> : reply.trim().slice(0, 600)}
     </span>
   );
 }
@@ -89,6 +97,7 @@ function TodayRow(props: {
   onOpen: (thread: Thread) => void;
 }) {
   const { thread } = props;
+  const m = useMessages();
   const bucket = todayBucket(thread);
   return (
     <li className={cn("list-none", props.nested && "ps-6")}>
@@ -110,7 +119,7 @@ function TodayRow(props: {
             </span>
           ) : null}
           <span className="w-28 shrink-0 text-right text-muted-foreground text-xs">
-            {BUCKET_LABEL[bucket]} · {timeLabel(lastActivityAt(thread))}
+            {m(BUCKET_LABEL[bucket])} · {timeLabel(lastActivityAt(thread))}
           </span>
         </TooltipTrigger>
         <TooltipPopup side="bottom" align="start" className="max-w-md text-left">
@@ -131,7 +140,7 @@ function DailySummary({ thread }: { thread: Thread }) {
         <ChatMarkdown text={reply} cwd={undefined} />
       </div>
       <Button size="xs" variant="ghost" className="mt-2" onClick={() => setExpanded(!expanded)}>
-        {expanded ? "Show less" : "Show all"}
+        {expanded ? <T>Show less</T> : <T>Show all</T>}
       </Button>
     </div>
   );
@@ -140,6 +149,8 @@ function DailySummary({ thread }: { thread: Thread }) {
 export function TodayPage() {
   const search: TodaySearch = useSearch({ strict: false });
   const navigate = useNavigate();
+  const gt = useGT();
+  const m = useMessages();
   // oxlint-disable-next-line react/purity -- the page names its day from the clock when it renders
   const now = new Date();
   const offset = dayOffsetOf(search.day, now, MAX_DAYS_BACK);
@@ -163,7 +174,8 @@ export function TodayPage() {
     projects.map((project) => [`${project.environmentId}:${project.id}`, project]),
   );
   const workspaceNameOf = (thread: Thread) =>
-    projectByKey.get(`${thread.environmentId}:${thread.projectId}`)?.title ?? "Other";
+    projectByKey.get(`${thread.environmentId}:${thread.projectId}`)?.title ??
+    gt("Other", { $context: "threads without a workspace" });
 
   const launchedBy = (thread: Thread) =>
     thread.launchedByThreadId === null
@@ -251,20 +263,22 @@ export function TodayPage() {
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none">
       <div
-        {...workspaceAreaProps("today", 1, "Today")}
+        {...workspaceAreaProps("today", 1, gt("Today"))}
         className="flex min-h-0 min-w-0 flex-1 flex-col bg-background"
       >
         <WorkspacePageHeader electron={isElectron} className="bg-background">
-          <WorkspaceBreadcrumb ariaLabel="Today breadcrumb">
+          <WorkspaceBreadcrumb ariaLabel={gt("Today breadcrumb")}>
             <WorkspaceBreadcrumbItem current>
-              <h1 className="truncate">{offset === 0 ? `Today · ${heading}` : heading}</h1>
+              <h1 className="truncate">
+                {offset === 0 ? gt("Today · {date}", { date: heading }) : heading}
+              </h1>
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
           <div className="min-w-0 flex-1" />
           <Button
             size="icon-sm"
             variant="ghost"
-            aria-label="Previous day"
+            aria-label={gt("Previous day")}
             disabled={offset <= -MAX_DAYS_BACK}
             onClick={() => goToDay(offset - 1)}
           >
@@ -273,7 +287,7 @@ export function TodayPage() {
           <Button
             size="icon-sm"
             variant="ghost"
-            aria-label="Next day"
+            aria-label={gt("Next day")}
             disabled={offset >= 0}
             onClick={() => goToDay(offset + 1)}
           >
@@ -293,17 +307,21 @@ export function TodayPage() {
                     onClick={() => setFilter(filter === bucket ? null : bucket)}
                   >
                     <span aria-hidden className={cn("size-2 rounded-full", BUCKET_DOT[bucket])} />
-                    {count} {BUCKET_LABEL[bucket].toLowerCase()}
+                    {m(BUCKET_COUNT[bucket], { count })}
                   </Button>
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm">No threads were active this day.</p>
+              <p className="text-muted-foreground text-sm">
+                <T>No threads were active this day.</T>
+              </p>
             )}
 
             {daily ? (
               <section className="flex flex-col gap-2">
-                <h2 className="font-medium text-sm">Daily</h2>
+                <h2 className="font-medium text-sm">
+                  <T context="the daily summary thread">Daily</T>
+                </h2>
                 {filter === null ? <DailySummary thread={daily} /> : null}
                 <ul className="flex flex-col">
                   {renderRows([daily], false)}
@@ -317,7 +335,9 @@ export function TodayPage() {
               if (rows.length === 0) return null;
               return (
                 <section key={key} className="flex flex-col gap-1">
-                  <h2 className="font-medium text-sm">{project?.title ?? "Other"}</h2>
+                  <h2 className="font-medium text-sm">
+                    {project?.title ?? gt("Other", { $context: "threads without a workspace" })}
+                  </h2>
                   <ul className="flex flex-col">{rows}</ul>
                 </section>
               );

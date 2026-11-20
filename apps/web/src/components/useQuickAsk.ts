@@ -1,10 +1,13 @@
 import { useAtomValue } from "@effect/atom-react";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { ProjectId } from "@t3tools/contracts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { useNavigate } from "@tanstack/react-router";
+import { msg } from "gt-react";
 
+import { m } from "~/i18n/messages";
 import { newMessageId, newThreadId } from "~/lib/utils";
 import { usePrimarySettings } from "../hooks/useSettings";
 import { providerInstanceEntriesFor } from "../providerInstances";
@@ -50,8 +53,10 @@ export function useQuickAsk() {
     if (environmentId === null || project === undefined || modelSelection === null) {
       toastManager.add({
         type: "error",
-        title: `Could not start a thread in ${input.workspaceName}`,
-        description: "No provider is ready for this workspace.",
+        title: m(
+          msg("Could not start a thread in {workspace}", { workspace: input.workspaceName }),
+        ),
+        description: m(msg("No provider is ready for this workspace.")),
       });
       return;
     }
@@ -91,17 +96,19 @@ export function useQuickAsk() {
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: `Could not start a thread in ${input.workspaceName}`,
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: m(
+          msg("Could not start a thread in {workspace}", { workspace: input.workspaceName }),
+        ),
+        description: thrownErrorMessage(error, m) ?? m(msg("An error occurred.")),
       });
       return;
     }
     const id = toastManager.add({
       type: "success",
-      title: `Started in ${input.workspaceName}`,
+      title: m(msg("Started in {workspace}", { workspace: input.workspaceName })),
       description: title,
       actionProps: {
-        children: "Open",
+        children: m(msg("Open", { $context: "verb, opens the new thread" })),
         onClick: () => {
           toastManager.close(id);
           void navigate({

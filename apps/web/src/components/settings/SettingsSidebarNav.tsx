@@ -53,6 +53,7 @@ import { scrollToSettingsTarget } from "./settingsLayout";
 import {
   searchSettings,
   revealSettingsSearchTarget,
+  SETTINGS_NAV_LABELS,
   SETTINGS_SECTION_LABELS,
   settingsNavGroupsFor,
   type SettingsPath,
@@ -60,7 +61,6 @@ import {
 } from "./settingsSearch";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
 import { useClientSettings } from "../../hooks/useSettings";
-import { workspaceTermsFor } from "../../workspaceTerms";
 import { handleSettingsSectionKeyDown } from "./settingsSectionNavigation";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
 
@@ -128,7 +128,7 @@ function scrollResultIntoView(row: HTMLElement | null) {
 
 function SettingsSectionIcon({ to }: { to: SettingsPath }) {
   const Icon = SETTINGS_SECTION_ICONS[to];
-  return <Icon className="size-4 shrink-0 text-(--sidebar-icon-color)" />;
+  return <Icon className="size-4 h-5 shrink-0 text-(--sidebar-icon-color)" />;
 }
 
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
@@ -140,7 +140,6 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const activePath = SETTINGS_DETAIL_PAGE_PARENTS[pathname] ?? pathname;
   const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   const navGroups = settingsNavGroupsFor(ceoModeEnabled);
-  const projectsLabel = workspaceTermsFor(ceoModeEnabled).Many;
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   // Below md the nav is an icon rail; searching expands it over the page.
@@ -418,9 +417,9 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                                       !compactSearchOpen && "max-md:sr-only",
                                     )}
                                   >
-                                    {to === "/settings/projects"
-                                      ? projectsLabel
-                                      : m(SETTINGS_SECTION_LABELS[to])}
+                                    {to === "/settings/projects" && ceoModeEnabled
+                                      ? gt("Workspaces")
+                                      : m(SETTINGS_NAV_LABELS[to])}
                                   </span>
                                 </SidebarMenuButton>
                               </SidebarMenuItem>

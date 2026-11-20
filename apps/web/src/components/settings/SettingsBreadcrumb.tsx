@@ -1,4 +1,4 @@
-import { msg, useMessages } from "gt-react";
+import { msg, useGT, useMessages } from "gt-react";
 
 import {
   WorkspaceBreadcrumb,
@@ -6,7 +6,7 @@ import {
   WorkspaceBreadcrumbSeparator,
 } from "../WorkspaceBreadcrumb";
 import { SETTINGS_SECTION_LABELS } from "./settingsSearch";
-import { useWorkspaceTerms } from "../../hooks/useWorkspaceTerms";
+import { useClientSettings } from "../../hooks/useSettings";
 
 const SETTINGS_LABEL = msg("Settings");
 
@@ -22,16 +22,17 @@ function settingsBreadcrumbLabel(pathname: string): string | null {
 }
 
 export function SettingsBreadcrumb({ pathname }: { pathname: string }) {
+  const gt = useGT();
   const m = useMessages();
-  const terms = useWorkspaceTerms();
+  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   const sectionLabel = settingsBreadcrumbLabel(pathname);
   const sectionText =
-    (pathname.replace(/\/+$/, "") || "/") === "/settings/projects"
-      ? terms.Many
+    ceoModeEnabled && (pathname.replace(/\/+$/, "") || "/") === "/settings/projects"
+      ? gt("Workspaces")
       : m(sectionLabel ?? SETTINGS_LABEL);
 
   return (
-    <WorkspaceBreadcrumb ariaLabel="Settings breadcrumb">
+    <WorkspaceBreadcrumb ariaLabel={gt("Settings breadcrumb")}>
       {sectionLabel ? (
         <>
           <WorkspaceBreadcrumbItem>{m(SETTINGS_LABEL)}</WorkspaceBreadcrumbItem>

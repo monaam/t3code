@@ -1,3 +1,4 @@
+import { T, useMessages } from "gt-react";
 import {
   getClientSettings,
   updateClientSettings,
@@ -16,10 +17,13 @@ import {
 export function ThreadDetailsItemsMenuItems() {
   const visibility = useClientSettings(resolveThreadDetailsVisibility);
   const items = threadDetailsItemsFor(useClientSettings((settings) => settings.ceoModeEnabled));
+  const m = useMessages();
   return (
     <>
       <MenuGroup>
-        <MenuGroupLabel>Show in thread details</MenuGroupLabel>
+        <MenuGroupLabel>
+          <T>Show in thread details</T>
+        </MenuGroupLabel>
         {items.map((item) => (
           <MenuCheckboxItem
             key={item.id}
@@ -30,7 +34,7 @@ export function ThreadDetailsItemsMenuItems() {
               })
             }
           >
-            {item.label}
+            {m(item.label)}
           </MenuCheckboxItem>
         ))}
       </MenuGroup>
@@ -39,7 +43,7 @@ export function ThreadDetailsItemsMenuItems() {
         disabled={isDefaultThreadDetailsVisibility(visibility, items)}
         onClick={() => updateClientSettings(RESET_THREAD_DETAILS_ITEMS)}
       >
-        Reset to default
+        <T>Reset to default</T>
       </MenuItem>
     </>
   );

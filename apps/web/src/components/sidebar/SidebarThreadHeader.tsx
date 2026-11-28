@@ -1,5 +1,5 @@
 import { useGT } from "gt-react";
-import { FolderPlusIcon, InboxIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { InboxIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -11,15 +11,13 @@ import {
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { SidebarInput, SidebarMenuButton } from "../ui/sidebar";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { useClientSettings } from "../../hooks/useSettings";
+import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 export interface SidebarThreadHeaderProps {
   hasProjects: boolean;
   projectScope: ReactNode;
   /** CEO mode's filter to threads waiting on the user; null hides it. */
   needsMe: { active: boolean; count: number; onToggle: () => void } | null;
-  onNewProject: () => void;
   onNewThread: (event: ReactMouseEvent) => void;
   newThreadDisabled: boolean;
   newThreadShortcutLabel: string | null | undefined;
@@ -39,7 +37,6 @@ export function SidebarThreadHeader({
   hasProjects,
   projectScope,
   needsMe,
-  onNewProject,
   onNewThread,
   newThreadDisabled,
   newThreadShortcutLabel,
@@ -54,7 +51,6 @@ export function SidebarThreadHeader({
   activeSearchResultIndex,
   onClearSearch,
 }: SidebarThreadHeaderProps) {
-  const ceoModeEnabled = useClientSettings((settings) => settings.ceoModeEnabled);
   const gt = useGT();
   const resultsVisible = isSearching && searchResultCount > 0;
   // Shrinking results can remove the active option; never leave aria-activedescendant pointing at it.
@@ -123,17 +119,7 @@ export function SidebarThreadHeader({
             ) : null}
           </SidebarHeaderIconButton>
         ) : null}
-        {hasProjects ? (
-          <>
-            {projectScope}
-            <SidebarHeaderIconButton
-              label={ceoModeEnabled ? gt("Add workspace") : gt("Add project")}
-              onClick={onNewProject}
-            >
-              <FolderPlusIcon />
-            </SidebarHeaderIconButton>
-          </>
-        ) : null}
+        {hasProjects ? projectScope : null}
         <SidebarHeaderIconButton
           label={gt("New thread")}
           tooltip={
@@ -178,25 +164,23 @@ export function SidebarHeaderIconButton({
   "children" | "className" | "tooltip" | "aria-label"
 >) {
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <SidebarMenuButton
-            size="icon"
-            type="button"
-            aria-label={label}
-            {...rest}
-            className={cn("relative size-7 shrink-0", className)}
-          />
-        }
-      >
-        {children}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
+    <SharedTooltipTrigger
+      render={
+        <SidebarMenuButton
+          size="icon"
+          type="button"
+          aria-label={label}
+          {...rest}
+          className={cn("relative size-7 shrink-0", className)}
         />
-      </TooltipTrigger>
-      <TooltipPopup side="top">{tooltip}</TooltipPopup>
-    </Tooltip>
+      }
+      label={tooltip}
+    >
+      {children}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
+      />
+    </SharedTooltipTrigger>
   );
 }
